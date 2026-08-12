@@ -2,8 +2,15 @@
 open/data/
 test/data/
 
-# 학습 산출물 — 재생성 가능, 용량만 차지
+# 학습 산출물 — 재생성 가능, 용량만 차지.
+# 단, 현 계보(003→007→009→010→012)의 모델은 남긴다. train_offset.py/build_shift.py가
+# BASE_RUN·AUX_FROM의 모델을 파일째 복사하는 구조라 이게 없으면 clone 후 실행이 불가능하다.
 test/runs/*/model/
+!test/runs/003_catboost_fe/model/
+!test/runs/007_seeds7/model/
+!test/runs/009_offset/model/
+!test/runs/010_offset_seeds7/model/
+!test/runs/012_shift_full/model/
 test/catboost_info/
 test/*.log
 test/probe_aux_val2024.csv.gz

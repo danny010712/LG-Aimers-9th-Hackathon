@@ -33,9 +33,7 @@ from scipy.optimize import brentq
 RUN = "012_shift_full"
 BASE_RUN = "010_offset_seeds7"
 # 010이 245,789행 가짜 test(2024 행)에 낸 예측. 이동량 산출의 기준.
-PRED = ("C:/Users/ssy84/AppData/Local/Temp/claude/"
-        "c--Users-ssy84-MyProjects-10-LGAimers/"
-        "b8c5623b-34db-44ed-9743-5d9ac909853b/scratchpad/sub010.csv")
+PRED = "artifacts/sub010.csv.gz"
 EST_2025 = 0.477          # 10 문서 §6-C 중앙 추정
 FRACTION = 1.0            # 전량. 011(절반)이 예측대로 나와 계획대로 완성한다
 COMMON = "common"

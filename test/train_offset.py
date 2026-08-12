@@ -16,7 +16,7 @@
    무제약형 자기연도 +53.8 → 한 해 건너 −210~−638. a=1·d=0 고정이 필수다.
 🔴 mu는 **학습 때 계산해 저장**한다. test에서 평균을 내면 규정 위반(test 내부 행간 통계).
 
-계수 b,c와 mu는 scratchpad/aux/ 의 검증 예측(2019~23 학습 → 2024)에서 적합한다.
+계수 b,c와 mu는 artifacts/auxpred/ 의 검증 예측(2019~23 학습 → 2024)에서 적합한다.
 배포 유사 실측: 2022 계수를 2024에 적용 → +26.6 (08 §5).
 
 라벨: test/recovered_labels.csv.gz (09 세션 산출, 본 세션 검증 완료).
@@ -45,9 +45,7 @@ AUX_FROM = "009_offset"               # 보조모델을 복사해올 run. None�
 # 계수 적합에 쓸 검증 예측(2019~23 학습 -> 2024)의 시드.
 # 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (007=7시드).
 FIT_SUCCESS_SEEDS = [42, 7, 2024, 99, 1, 123, 777]
-CACHE = ("C:/Users/ssy84/AppData/Local/Temp/claude/"
-         "c--Users-ssy84-MyProjects-10-LGAimers/"
-         "b8c5623b-34db-44ed-9743-5d9ac909853b/scratchpad/aux")
+CACHE = "artifacts/auxpred"       # "aux"는 Windows 예약 장치명이라 git이 못 연다
 # 검증(2019~23 -> 2024)에서 얻은 조기중단 지점. 전체 재학습에 그대로 쓴다.
 BEST_ITER = {"mr": {42: 360, 7: 480, 2024: 404},
              "wayoff": {42: 351, 7: 354, 2024: 438}}

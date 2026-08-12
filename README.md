@@ -87,6 +87,18 @@ python train_offset.py    # 보조모델 + offset 계수
 python build_shift.py     # 전역 로짓 이동 적용 → submit zip
 ```
 
+세 스크립트는 모두 `test/`를 작업 디렉토리로 가정함. 경로가 전부 상대경로임.
+
+`train_offset.py`와 `build_shift.py`는 **이전 run의 산출물을 그대로 복사**해서 단일 변수를 보장하는 구조라, 재학습 없이도 계보를 이어가려면 다음이 repo에 함께 들어 있음:
+
+| 경로 | 용도 |
+|---|---|
+| `test/artifacts/auxpred/*.npy` | 2019~23 학습 → 2024 검증 예측 13개 (`success` 7시드, `mr`/`wayoff` 각 3시드). offset 계수 `b`·`c`와 `mu` 적합에 씀. 재생성하려면 CatBoost 13개 재학습 = 수 시간 |
+| `test/artifacts/sub010.csv.gz` | run 010이 245,789행 가짜 test에 낸 예측. `logit_shift` 산출의 기준 (평균 0.487295) |
+| `test/runs/{003,007,009,010,012}/model/` | 현 계보 모델. `BASE_RUN`·`AUX_FROM`이 여기서 파일째 복사됨 |
+
+죽은 축(001·002·004 `cond`·005 `depth8`·006 `grow_policy`·011)의 모델은 제외. `result.json`에 로컬↔LB 기록은 남아 있음.
+
 제출 전 **전체규모 검증 필수** — 245,789행 가짜 test로 구조·시간·결측·범위 확인:
 
 ```bash

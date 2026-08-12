@@ -87,6 +87,7 @@ open/       baseline_submit/(주최측 RF), data_description.md
 test/       train_local.py · train_offset.py · recover_labels.py · recovered_labels.csv.gz
             common/{script.py, features.py, cond.py, requirements.txt}  ← zip에 그대로 들어감
             data/ → open/data (junction) · runs/<NNN_name>/{model/, result.json, submitNNN.zip}
+            artifacts/{auxpred/*.npy, sub010.csv.gz}  ← offset 계수·logit_shift 적합 입력
 ```
 
 **강의정리 규칙**: 강의당 md 1개, 배지 🔥해커톤핵심/⭐중요/📎참고, 상단 압축요약 → 본문 → 하단 적용포인트 + `💬 Q&A 메모`(사용자 질문·답변 요약 누적). 새 자료 추가 시 README 갱신.
@@ -219,6 +220,7 @@ offset  : logit(p) = logit(p_success) + b·(logit(p_mr)−mu_mr) + c·(logit(p_w
 | 종료코드 `-1073741676` | CatBoost `thread_count=0` | **CatBoost는 `-1`** (LightGBM만 0=전체) |
 | 학습 4배 느려짐 | 6코어에 동시 실행 | 무거운 학습은 순차로 (431s→1819s 실측) |
 | PDF 안 읽힘 | poppler 미설치 | `pypdf`로 텍스트 추출 → scratchpad txt → Read (원본 무수정) |
+| `git add` 가 `open(...): No such file or directory` (파일은 실제로 있음) | 경로에 Windows 예약 장치명 — `aux` `con` `prn` `nul` `com1~9` `lpt1~9`. 디렉토리 이름이어도 걸린다 | 이름 변경(`aux` → `auxpred`). Python·MSYS `cp`·`ls`는 전부 통과하고 git만 막혀서 늦게 드러난다 |
 
 - Bash 워드분할: 한글/공백 경로 loop 깨짐 → python glob.
 - ⚠️ **스크립트로 문자열 치환했으면 반드시 검증**하고 출력할 것. 치환은 조용히 실패한다(공백·따옴표 한 글자). 실제로 4개 중 1개가 실패해 변수 미정의로 30분짜리 학습이 돌았다.
