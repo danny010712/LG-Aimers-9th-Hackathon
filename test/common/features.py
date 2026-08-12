@@ -5,15 +5,14 @@
 """
 import numpy as np
 
-# 저cardinality 범주형만. 선수 ID(792/830종)는 범주형으로 주면 과적합
-# (LightGBM 612.9→199.5, CatBoost 780.0→647.3). 수치형으로 남긴다.
+# 저cardinality 범주형만. 선수 ID는 범주형으로 주면 과적합
 BASE_CAT = ["top_bottom", "game_type", "base_state", "pitcher_hand",
             "batter_hand", "pitcher_team_id", "batter_team_id"]
 CAT_COLS = BASE_CAT + ["count_state"]
 
 
 def engineer(df, global_mean, m=30):
-    """원본 열은 하나도 버리지 않고 파생 열만 추가한다."""
+
     d = df.copy()
 
     # 1) 베이지안 스무딩 — 표본 적은 투수/타자를 리그평균 쪽으로 당겨 cold-start 완화
@@ -37,7 +36,6 @@ def engineer(df, global_mean, m=30):
                            - d["asof_pitcher_prev5_game_success_rate"])
 
     # 5) 홈 여부: 홈팀이 초(T)에 던진다.
-    #    score_diff 비교로 구하면 동점(전체 25.6%)일 때 항상 홈이 되는 버그.
     d["is_home"] = (d["top_bottom"] == "T").astype(int)
     d["pitcher_win_expectancy"] = np.where(d["is_home"] == 1,
                                            d["home_win_expectancy"],
