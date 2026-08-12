@@ -1,0 +1,31 @@
+{
+  "run": "005_d8_cond",
+  "note": "004 + depth 8. 3-fold 합계 d6_base 3142.6 -> d8_cond 3166.7 (§3-K)",
+  "model": "catboost",
+  "seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 8,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    155,
+    132,
+    206
+  ],
+  "val_2024": {
+    "brier": 0.24780008634032727,
+    "skill": 0.008033565932359266,
+    "score": 803.3565932359265
+  },
+  "lb_2025": 842.1398768128
+}

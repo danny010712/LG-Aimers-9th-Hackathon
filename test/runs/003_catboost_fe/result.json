@@ -1,0 +1,31 @@
+{
+  "run": "003_catboost_fe",
+  "note": "CatBoost + cat_features + 선별 FE, 3시드 예측평균 (08 문서 §3-E)",
+  "model": "catboost",
+  "seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 57,
+  "best_iters": [
+    278,
+    257,
+    278
+  ],
+  "val_2024": {
+    "brier": 0.24785026284974493,
+    "skill": 0.007832704771025267,
+    "score": 783.2704771025267
+  },
+  "lb_2025": 881.7260193696
+}

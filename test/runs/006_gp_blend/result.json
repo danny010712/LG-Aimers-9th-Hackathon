@@ -1,0 +1,37 @@
+{
+  "run": "006_gp_blend",
+  "note": "005 + grow_policy 혼합(Symmetric+Depthwise). 3-fold 3166.7 -> 3191.5 (§3-L)",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Dep_42",
+    "Dep_7",
+    "Dep_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 8,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    155,
+    132,
+    206,
+    122,
+    134,
+    146
+  ],
+  "val_2024": {
+    "brier": 0.24779798924151064,
+    "skill": 0.008041960810931559,
+    "score": 804.1960810931558
+  },
+  "lb_2025": null
+}

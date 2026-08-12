@@ -1,0 +1,31 @@
+{
+  "run": "004_cond",
+  "note": "003 + 조건부 개인기록(cond). depth 6 유지 = 003과 단일 변수. 003(881.73) 대비 LB -5.4 -> cond는 소폭 손해. 004->005(depth8)가 -34.2로 주범. 08 문서 §0-3 교정 기준 검증됨.",
+  "model": "catboost",
+  "seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    253,
+    244,
+    313
+  ],
+  "val_2024": {
+    "brier": 0.24781888110309308,
+    "skill": 0.007958328776169088,
+    "score": 795.8328776169088
+  },
+  "lb_2025": 876.3690395794
+}
