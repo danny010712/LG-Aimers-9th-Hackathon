@@ -1,0 +1,36 @@
+{
+  "run": "001_id_categorical",
+  "note": "제출 #1 재현. pitcher_id/batter_id를 범주형 지정 -> 과적합 (08 문서 3-C)",
+  "cat_cols": [
+    "top_bottom",
+    "game_type",
+    "base_state",
+    "pitcher_hand",
+    "batter_hand",
+    "pitcher_team_id",
+    "batter_team_id",
+    "pitcher_id",
+    "batter_id"
+  ],
+  "params": {
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "learning_rate": 0.05,
+    "num_leaves": 63,
+    "min_data_in_leaf": 200,
+    "feature_fraction": 0.8,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "seed": 42,
+    "verbose": -1,
+    "num_threads": 0
+  },
+  "val_2024": {
+    "brier": 0.24930847834640207,
+    "base": 0.24980692675678798,
+    "skill": 0.0019953346244525605,
+    "score": 199.53346244525605,
+    "best_iter": 49
+  },
+  "lb_2025": null
+}

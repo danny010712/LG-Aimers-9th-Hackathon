@@ -1,0 +1,39 @@
+{
+  "run": "008_depth5",
+  "note": "007(d6, 7시드)에서 depth만 6->5. 007과 단일 변수 = 용량 축소 탐침. 근거: 004->005에서 depth 6->8이 로컬 +16 / LB -34.2 (§4-2). 2025는 미관측 시즌이라 얕은 트리가 외삽에 유리하다는 가설. ⚠️ 로컬은 낮게 나오는 게 정상 (d5 2시드 772.6 vs d6 782.9). 로컬은 §4대로 못 믿는다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 5,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 57,
+  "best_iters": [
+    315,
+    395,
+    377,
+    302,
+    318,
+    311,
+    309
+  ],
+  "val_2024": {
+    "brier": 0.24786735315487451,
+    "skill": 0.007764290714812105,
+    "score": 776.4290714812105
+  },
+  "lb_2025": null
+}

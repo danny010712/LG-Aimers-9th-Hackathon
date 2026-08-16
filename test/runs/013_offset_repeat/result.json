@@ -1,0 +1,52 @@
+{
+  "run": "013_offset_repeat",
+  "note": "007_seeds7 성공모델 그대로 + 실패모드 offset(mr/wayoff). 재학습 없음 = 단일 변수. a=1,d=0 고정(calibration 성분 제거), mu는 학습때 저장. 배포 유사 실측 2022계수->2024 = +26.6. 08 문서 §5",
+  "base_run": "007_seeds7",
+  "aux_from": "009_offset",
+  "success_seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "aux_seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss"
+  },
+  "offset": {
+    "seeds": [
+      42,
+      7,
+      2024
+    ],
+    "b": -0.10456770966541563,
+    "c": 0.011029782747845922,
+    "mu_mr": -0.5127720817592395,
+    "mu_wayoff": -1.987630651312223
+  },
+  "best_iters": {
+    "mr": {
+      "42": 360,
+      "7": 480,
+      "2024": 404
+    },
+    "wayoff": {
+      "42": 351,
+      "7": 354,
+      "2024": 438
+    }
+  },
+  "lb_2025": null
+}
