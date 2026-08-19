@@ -1,0 +1,44 @@
+{
+  "run": "025_all_features_main",
+  "note": "총 75개 피처, 제출용",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 75,
+  "best_iters": [
+    288,
+    373,
+    303,
+    219,
+    295,
+    231,
+    282
+  ],
+  "league_baseline": true,
+  "league_group_cols": [
+    "season",
+    "game_type"
+  ],
+  "val_2024": {
+    "brier": 0.2483753437953368,
+    "skill": 0.005730757669682118,
+    "score": 573.0757669682118
+  },
+  "lb_2025": null
+}

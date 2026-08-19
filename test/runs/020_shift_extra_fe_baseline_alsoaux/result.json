@@ -1,0 +1,11 @@
+{
+  "run": "020_shift_extra_fe_baseline_alsoaux",
+  "note": "019_offset_extra_fe_baseline_alsoaux + 잔여 전역 로짓 이동 +0.002936. league-rate baseline 적용 후 남은 평균 편차만 보정. 모델 재학습 없음 = 단일 변수. 가짜test 예측 평균 0.4740 → 0.4747 (2025 추정 0.4746946535529588).",
+  "base_run": "019_offset_extra_fe_baseline_alsoaux",
+  "logit_shift": 0.0029360916559904348,
+  "mean_before": 0.47396782517463654,
+  "mean_after": 0.47469465355295887,
+  "est_2025": 0.4746946535529588,
+  "fraction": 1.0,
+  "lb_2025": null
+}

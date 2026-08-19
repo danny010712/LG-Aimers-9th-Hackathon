@@ -1,0 +1,11 @@
+{
+  "run": "017_shift_league",
+  "note": "016_offset_league + 잔여 전역 로짓 이동 +0.017369. league-rate baseline 적용 후 남은 평균 편차만 보정. 모델 재학습 없음 = 단일 변수. 가짜test 예측 평균 0.4704 → 0.4747 (2025 추정 0.4746946535529588).",
+  "base_run": "016_offset_league",
+  "logit_shift": 0.01736909856601836,
+  "mean_before": 0.47041540475171595,
+  "mean_after": 0.4746946535529586,
+  "est_2025": 0.4746946535529588,
+  "fraction": 1.0,
+  "lb_2025": null
+}

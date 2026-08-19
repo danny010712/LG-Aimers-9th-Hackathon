@@ -1,0 +1,44 @@
+{
+  "run": "015_league_baseline",
+  "note": "007(d6, 7시드)과 동일 피처·파라미터 + league-rate baseline 추가. season을 트리가 직접 외삽하지 않고, season×game_type 리그평균을 학습 전에 baseline으로 주입해 f(x)는 편차만 배우게 함. 08 §5-7 / 09 §3-B. 단일 변수 비교 대상 = 007.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 57,
+  "best_iters": [
+    309,
+    219,
+    312,
+    389,
+    304,
+    306,
+    294
+  ],
+  "league_baseline": true,
+  "league_group_cols": [
+    "season",
+    "game_type"
+  ],
+  "val_2024": {
+    "brier": 0.2483565669754163,
+    "skill": 0.005805922999019719,
+    "score": 580.592299901972
+  },
+  "lb_2025": null
+}

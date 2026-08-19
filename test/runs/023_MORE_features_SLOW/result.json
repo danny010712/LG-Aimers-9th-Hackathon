@@ -1,0 +1,36 @@
+{
+  "run": "023_MORE_features_SLOW",
+  "note": "smoothing column 10개로 확장, 기타 다양한 피처들",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.01,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 75,
+  "best_iters": [
+    1166,
+    1380,
+    1665
+  ],
+  "league_baseline": true,
+  "league_group_cols": [
+    "season",
+    "game_type"
+  ],
+  "val_2024": {
+    "brier": 0.2484141883738628,
+    "skill": 0.005575259265253041,
+    "score": 557.525926525304
+  },
+  "lb_2025": null
+}

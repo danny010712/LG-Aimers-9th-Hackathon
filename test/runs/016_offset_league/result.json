@@ -1,0 +1,53 @@
+{
+  "run": "016_offset_league",
+  "note": "015_league_baseline(league_baseline=True) 성공모델 그대로 + 실패모드 offset(mr/wayoff, baseline 미적용). 재학습 없음 = 단일 변수. a=1,d=0 고정, mu는 학습때 저장.",
+  "base_run": "015_league_baseline",
+  "aux_from": "009_offset",
+  "cache": "artifacts/auxpred_league",
+  "success_seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "aux_seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss"
+  },
+  "offset": {
+    "seeds": [
+      42,
+      7,
+      2024
+    ],
+    "b": -0.20437787489540088,
+    "c": -0.07029275646328362,
+    "mu_mr": -0.5127720817592395,
+    "mu_wayoff": -1.987630651312223
+  },
+  "best_iters": {
+    "mr": {
+      "42": 360,
+      "7": 480,
+      "2024": 404
+    },
+    "wayoff": {
+      "42": 351,
+      "7": 354,
+      "2024": 438
+    }
+  },
+  "lb_2025": null
+}

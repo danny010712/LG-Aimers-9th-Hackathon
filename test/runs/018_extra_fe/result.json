@@ -1,0 +1,44 @@
+{
+  "run": "018_extra_fe",
+  "note": "015(league-rate baseline)와 동일 + EXTRA_FE(10-column 스무딩, p_matchup, is_abs, pitchmix_entropy/concentration) 추가. 개인 노트북(Train812.ipynb) FE importance 탐색에서 나온 후보 5종. ⚠️ 08 §6-I 'FE 추가 8종'이 전부 실패했던 전례 있음 — 단일 변수 비교 대상 = 015(league_baseline만).",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 58,
+  "best_iters": [
+    314,
+    386,
+    297,
+    392,
+    372,
+    423,
+    464
+  ],
+  "league_baseline": true,
+  "league_group_cols": [
+    "season",
+    "game_type"
+  ],
+  "val_2024": {
+    "brier": 0.24838802825021766,
+    "skill": 0.005679980635411863,
+    "score": 567.9980635411863
+  },
+  "lb_2025": null
+}
