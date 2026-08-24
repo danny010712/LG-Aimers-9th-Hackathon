@@ -10,53 +10,191 @@
 - 궁금한 거 있으시면 언제든 물어봐주세요.
 ```
 
-## 현황 (2026-08-13)
+## 현황 (2026-08-24)
 
 | 항목 | 값 |
 |---|---|
-| 우리 점수 | **998.00** |
-| 100위 컷 | 1059.12 → **+61.1 필요** |
-| 1위 | 1295.47 |
+| 우리 점수 | **1051.73** (팀 제출 57회) |
+| 100위 컷 | 1124.70 → **+73.0 필요** |
+| 1위 | 1421.99 · 3위 1218.66 · 10위 1171.22 |
 
-## 현재 구성 — [submit012](test/runs/012_shift_full)
+## 현재 구성 — [submit015](test/runs/015_shift_inseason)
 
 ```
-성공모델: CatBoost depth 6, lr .05, cat_features 지정, FE 10개, 7시드 평균
+성공모델: CatBoost depth 6, lr .05, cat_features 지정
+          FE 10개 + 시즌내 성적 분해 4개, 3시드 평균
 offset  : logit(p) = logit(p_success) + b·(logit(p_mr) − mu_mr) + c·(logit(p_wayoff) − mu_wayoff)
-          b ≈ −0.105, c ≈ +0.011, a=1·d=0 고정, mu는 학습 때 저장
-shift   : 위 결과에 전역 로짓 −0.041639 (예측 평균 0.4873 → 0.4770)
+          b = −0.0990, c = +0.0074, a=1·d=0 고정, mu는 학습 때 저장
+shift   : 전역 로짓 −0.043768 (2025 base rate 추정 0.4762)
 ```
 
-`a`·`d`를 적합하면 그게 calibration이고 시즌 전이가 깨짐. `mu`와 `logit_shift`는 **학습 때 계산해 meta에 저장** — test에서 평균 내면 test 행간 통계로 규정 위반.
+- `a`·`d`를 적합하면 그게 calibration이고 시즌 전이가 깨집니다.
+- `mu`·`logit_shift`·기준점 표는 **학습 때 계산해 zip에 싣습니다.**
+  test에서 평균 내면 test 행간 통계라 규정 위반입니다.
+- 보조모델(`mr`/`wayoff`)은 아직 003 피처(57열)입니다. 주모델(61열)과 Pool을 공유하면
+  CatBoost가 피처 불일치로 죽어서, `offset.aux_feature_cols`로 열 부분집합을 따로 뽑습니다.
 
 - 자세한 설명은 아래 주요 변화 목록을 참고해주세요.
 
 ## 주요 코드
-1. [features.py](test/common/features.py) : 피처 정의
-2. [script.py](test/common/script.py) : 평가 서버 추론 스크립트
-3. [train_local.py](test/train_local.py) : 로컬 학습 스크립트
-4. [train_offset.py](test/train_offset.py) : 제구 실패 유형별 offset 빌드
-5. [build_shift.py](test/build_shift.py) : 시즌 base rate 보정
-6. [recover_labels.py](test/recover_labels.py) : 숨은 투구 라벨 복원 
+
+| 파일 | 역할 |
+|---|---|
+| [features.py](test/common/features.py) | 피처 정의. 학습·추론이 **이 파일 하나를 공유**합니다 |
+| [script.py](test/common/script.py) | 평가 서버 추론 스크립트 |
+| [train_local.py](test/train_local.py) | 성공모델 학습 |
+| [make_valpred.py](test/make_valpred.py) | offset 계수 적합용 2024 검증 예측 캐시 |
+| [train_offset.py](test/train_offset.py) | 제구 실패 유형별 offset 빌드 |
+| [build_shift.py](test/build_shift.py) | 시즌 base rate 보정 |
+| [verify_submit.py](test/verify_submit.py) | 제출 전 전체규모 검증 |
+| [recover_labels.py](test/recover_labels.py) | 숨은 투구 라벨 복원 |
 
 ## 주요 변화
 
-| 변경 | 점수 변화 | 모델명 |
+| 변경 | 점수 | 모델명 |
 |---|---|---|
 | CatBoost + `cat_features` 지정 + 선수ID 범주형 제거 + `season` 수치형 + depth 6 + FE 10 | **881.73** | [submit003](test/runs/003_catboost_fe) |
 | 제구 실패 유형별 offset (`mr`/`wayoff` 보조모델, `a=1·d=0` 고정) | **+63.7** | [submit009](test/runs/009_offset) |
 | 시드 3 → 7 | +5.6 | [submit010](test/runs/010_offset_seeds7) |
-| 시즌 base rate 로짓 이동 (−0.0416, 2025 추정 0.477) | **+47.04** | [submit012](test/runs/012_shift_full) |
+| 시즌 base rate 로짓 이동 | **+47.04** | [submit012](test/runs/012_shift_full) |
+| **시즌내 성적 분해** (`asof` 통산에서 직전 시즌 말 기준점을 뺀다) | **+53.7** | [submit015](test/runs/015_shift_inseason) |
 
-- 아래는 작성중입니다. 최대한 빨리 완성할게요..
+---
 
-### [submit003](test/runs/003_catboost_fe)
+### [submit003](test/runs/003_catboost_fe) — 881.73
 
-### [submit009](test/runs/009_offset)
+네 가지를 동시에 고쳤습니다. 개별 기여는 나중에 따로 쟀습니다.
 
-### [submit010](test/runs/010_offset_seeds7)
+| 항목 | 기여 |
+|---|---|
+| CatBoost `cat_features` **실제 지정** | **+114** |
+| 선별 FE 10개 | +98 |
+| 3시드 예측 평균 | +9.4 |
+| 선수 ID를 범주형에서 제거 | (범주형이면 −413) |
 
-### [submit012](test/runs/012_shift_full)
+- `cat_features`를 지정하지 않고 `OrdinalEncoder`로 숫자를 넣으면 CatBoost의 ordered target
+  statistics가 아예 작동하지 않습니다. 가장 큰 단일 이득이었습니다.
+- **`pitcher_id`/`batter_id`는 범주형으로 주면 안 됩니다.** 개인을 암기해서 과적합합니다
+  (LGBM 612.9 → 199.5). 수치형으로 두거나 빼면 되고, 둘의 차이는 없습니다.
+- **`season`은 반드시 수치형입니다.** 범주형이면 미관측 시즌(2025)에 값이 없어 붕괴합니다(780 → 605).
+- FE는 주자·압박 관련 플래그를 전부 뺀 10개입니다. 제구 성공은 주자 상황과 사실상 무관했습니다.
+
+### [submit009](test/runs/009_offset) — +63.7
+
+제구 실패에는 세 종류가 있습니다. **한복판**, **크게 벗어남**, **포수 요구 반대**.
+그런데 정답은 성공/실패 1비트로만 주어져서, 어떤 실패인지가 합쳐지면서 사라집니다.
+
+`asof_*_rate`가 `누적 성공수 / 누적 투구수` 구조라서, 연속한 두 투구의 차분을 취하면
+**투구별 사건을 복원**할 수 있습니다([recover_labels.py](test/recover_labels.py)).
+147만 행 전부 복원했고, 답을 아는 `success`로 검증해 100% 일치했습니다.
+
+복원한 라벨로 보조모델 두 개를 학습해서 본 모델 출력을 로짓 공간에서 밉니다.
+
+```
+logit(p) = logit(p_success) + b·(logit(p_mr) − mu_mr) + c·(logit(p_wayoff) − mu_wayoff)
+
+mr     = 한복판 ∪ 반대     (겹치는 5만 건이 있어 따로 두면 이중계산이 됩니다)
+wayoff = 실패인데 둘 다 아님 (정의상 mr과 서로소)
+```
+
+`실패 ⟺ (한복판∪반대) ⊎ 크게벗어남` 이 예외 0건으로 성립합니다.
+즉 타깃을 쪼개는 성분은 **정확히 두 개**이고 둘 다 쓰고 있습니다.
+
+🔴 **스케일 `a`와 절편 `d`는 적합하면 안 됩니다.** 그게 calibration이고 시즌 간 전이가 깨집니다
+— 자유 계수로 두면 자기 연도에서는 +53.8인데 한 해 건너면 **−210~−638**이 됩니다.
+`a=1`·`d=0` 고정이 필수입니다.
+
+🔴 **본 모델을 재학습하지 않습니다.** 003의 모델 파일을 그대로 복사하고 보정항만 얹습니다.
+`b=c=0`이면 003과 완전히 같은 출력이 나오는 구조라 진짜 단일 변수이고, 모델 용량도 안 늘어납니다.
+
+### [submit010](test/runs/010_offset_seeds7) — +5.6
+
+시드 평균을 3개에서 7개로. 로컬로는 +3.8이었습니다.
+
+시드 평균은 fold 설계와 무관하게 작동하는 거의 유일한 개선 수단이지만 **3개에서 대체로 포화**합니다
+(1→4시드에서 각 fold +10.5, 3→4는 +1.2). 3→7이 사실상 천장입니다.
+
+### [submit012](test/runs/012_shift_full) — +47.04
+
+리그 제구 성공률이 6년 연속 떨어지고 있습니다.
+
+```
+2019 .565 → 2020 .533 → 2021 .533 → 2022 .529 → 2023 .500 → 2024 .486
+```
+
+트리는 미관측 시즌을 외삽하지 못합니다. `season`을 수치형으로 줘도 2025는 마지막 칸에 들어가
+**2024와 똑같이 취급**됩니다. 그래서 2025 예측 평균이 2024 수준에 갇힙니다.
+
+Brier는 평균 편향 δ에 제곱으로 반응합니다. 이동량 `s`를 걸면 `ΔBrier = −2sδ + s²`이고,
+최적은 `s = δ`입니다. 예측 평균을 2025 추정치까지 미는 상수 하나를 meta에 저장했습니다.
+
+절반(011) → 전량(012) 두 단계로 냈고 **두 번 다 예측이 맞았습니다**
+(+31.8 예측 → 실측 +34.13, +13.0 → +12.91). 두 관측을 연립해 풀면 실제 2025 base rate는
+약 **0.4764**였습니다.
+
+⚠️ 이건 **§6-J에서 −469.5로 실패했던 것과 다릅니다.** 그때는 하락폭을 fold에서 *적합*했고,
+여기는 도메인 추정치를 *상수로 고정*했습니다. 금지해야 할 것은 "사후 이동"이 아니라
+**"이동량을 fold에서 적합하는 것"** 입니다.
+
+---
+
+### [submit015](test/runs/015_shift_inseason) — +53.7 (로컬 +75.3)
+
+**단일 피처 축으로는 지금까지 최대입니다.**
+
+#### 문제
+
+`asof_*`는 **시즌 리셋이 없는 통산 기록**입니다. 리그 성공률이 계속 떨어지고 있으니
+통산값은 **항상 실제보다 높습니다.**
+
+| 2024 fold | 값 | 편차 |
+|---|---|---|
+| `asof_pitcher_success_rate` 평균 | .5114 | **+.0253** |
+| 실제 2024 성공률 | .4861 | — |
+
+투수 23633이 극단적인 예입니다. 통산 14,543구 중 **13,637구(94%)가 2023년 이전**입니다.
+"2024년의 이 투수"를 물어보는데 데이터는 "2019~2023년의 이 투수"를 답하고 있습니다.
+
+#### 처방 — 통산은 누적이니까 뺄셈이 됩니다
+
+```
+n₁, r₁ = 그 행의 asof (통산)       ← test 행이 직접 들고 있음
+n₀, s₀ = 직전 시즌 말 통산         ← train으로 만든 기준점 표
+
+시즌내 = (n₁·r₁ − s₀) / (n₁ − n₀)
+```
+
+투수 23633의 2024년 5월 어느 투구:
+
+```
+통산             14,543구, 성공률 .5337
+2023년 말 기준   13,637구, 성공 7,236회
+빼면 2024 시즌내    906구, 성공  526회  →  .5806      (실제 .5874)
+```
+
+오차 .054 → **.007**. 전체 2024로는 편차 **+.0253 → +.0033 (7.7배 감소)** 입니다.
+
+#### 왜 모델이 스스로 못 하나
+
+모델이 보는 건 `n₁`, `r₁` 두 숫자뿐이고 **`n₀`, `s₀`는 어느 컬럼에도 없습니다.**
+투수 ID를 조회 키로 쓰면 되지만 그건 과적합 때문에 금지한 것입니다.
+
+→ 기존 피처를 어떻게 조합해도 도달할 수 없는 값입니다. **새 피처가 아니라 새 정보입니다.**
+
+지금까지 시도한 FE 8종이 전부 실패한 이유도 이걸로 설명됩니다 — **전부 기존 컬럼의 재조합이라
+정보가 하나도 늘지 않았습니다.** 새 아이디어를 볼 때 "표현력이 느는가"가 아니라
+**"정보가 느는가"** 를 먼저 물어보면 됩니다.
+
+
+#### ⚠️ 이어받을 때 밟게 되는 함정 3개 (전부 실제로 밟았습니다)
+
+1. `train_offset.py`가 `engineer()`에 anchor를 안 넘김 → `KeyError: ins_*`
+2. `anchor.csv`를 zip에 안 실음 → 추론에서 `FileNotFoundError`
+3. 보조모델(003 피처 57열)과 주모델(61열)의 Pool 불일치 → CatBoost 사망
+   → `offset.aux_feature_cols`에 목록을 저장하고 `prepare()`로 **열 부분집합만** 다르게 뽑습니다.
+   `engineer()`를 두 번 돌릴 필요는 없습니다(61 ⊃ 57이므로)
+
+---
 
 ## 로컬은 올랐는데 실제 제출에서 효과 못 본 것
 
@@ -66,6 +204,17 @@ shift   : 위 결과에 전역 로짓 −0.041639 (예측 평균 0.4873 → 0.47
 | depth 8 | +7.6 | **−34.2** |
 | 사후 calibration | 천장 +89 | **−23** |
 
+**델타를 어떻게 쟀느냐가 전부였습니다.**
+
+| 측정 방식 | 로컬 → LB |
+|---|---|
+| out-of-year (계수를 T−1에서 맞춰 T에 적용) | offset +26.6 → **+63.7** · 시즌내 +75.3 → **+59.2** |
+| fold 내부 | cond +12.5 → **−5.4** · depth8 +7.6 → **−34.2** |
+
+- **out-of-year로 잰 델타는 부호가 유지되고, fold 내부 델타는 뒤집힙니다.**
+- 배율은 예측할 수 없습니다(2.40 / 1.47 / 0.79). 기대치를 적을 땐 **0.8~2.4배 구간**으로 잡으세요.
+- **제출은 반드시 단일 변수로.** 한 번은 `cond`와 `depth8`을 동시에 바꿔서 원인 분리에 하루가 갔습니다.
+
 ## 재현 순서
 
 - 잘 돌아갈지 모르겠습니다. 해보고 안 되면 물어봐주세요.
@@ -73,34 +222,38 @@ shift   : 위 결과에 전역 로짓 −0.041639 (예측 평균 0.4873 → 0.47
 ```bash
 cd test
 python train_local.py     # 성공모델 학습. 상단 RUN 이름 변경 필수 (기존 RUN 있으면 실행 거부)
+python make_valpred.py    # ⚠️ 피처를 바꿨다면 필수. offset 계수 적합용 2024 검증 예측
 python train_offset.py    # 보조모델 + offset 계수
 python build_shift.py     # 전역 로짓 이동 적용 → submit zip
+python verify_submit.py runs/<RUN>/submit<NNN>.zip    # 제출 전 필수
 ```
 
-세 스크립트는 모두 `test/`를 작업 디렉토리로 가정함. 경로가 전부 상대경로임.
+스크립트는 전부 `test/`를 작업 디렉토리로 가정합니다. 경로가 전부 상대경로입니다.
 
-`train_offset.py`와 `build_shift.py`는 **이전 run의 산출물을 그대로 복사**해서 단일 변수를 보장하는 구조라, 재학습 없이도 계보를 이어가려면 다음이 repo에 함께 들어 있음:
+⚠️ **`make_valpred.py`를 건너뛰면 조용히 틀립니다.** offset 계수는 성공모델의 2024 out-of-sample
+예측에서 적합하는데, 캐시가 옛 피처 구성으로 만들어진 것이면 방금 학습한 모델과 다른 기준으로
+`b`·`c`가 잡힙니다. 에러가 안 나서 알아채기 어렵습니다.
+
+`train_offset.py`와 `build_shift.py`는 **이전 run의 산출물을 그대로 복사**해서 단일 변수를
+보장하는 구조라, 재학습 없이 계보를 이어가려면 다음이 repo에 함께 들어 있어야 합니다.
 
 | 경로 | 용도 |
 |---|---|
-| `test/artifacts/auxpred/*.npy` | 2019~23 학습 → 2024 검증 예측 13개 (`success` 7시드, `mr`/`wayoff` 각 3시드). offset 계수 `b`·`c`와 `mu` 적합에 씀. 재생성하려면 CatBoost 13개 재학습 = 수 시간 |
-| `test/artifacts/sub010.csv.gz` | run 010이 245,789행 가짜 test에 낸 예측. `logit_shift` 산출의 기준 (평균 0.487295) |
-| `test/runs/{003,007,009,010,012}/model/` | 현 계보 모델. `BASE_RUN`·`AUX_FROM`이 여기서 파일째 복사됨 |
+| `test/artifacts/auxpred/*.npy` | 2019~23 학습 → 2024 검증 예측. **003 피처(57열) 구성**. 009~012 계보용 |
+| `test/artifacts/auxpred_ins/*.npy` | 같은 것을 **시즌내 분해 피처(61열)** 로 만든 것. 013 이후 계보용 |
+| `test/runs/{003,007,009,010,012,013,014,015}/model/` | 현 계보 모델. `BASE_RUN`·`AUX_FROM`이 여기서 파일째 복사됨 |
 
-죽은 축(001·002·004 `cond`·005 `depth8`·006 `grow_policy`·011)의 모델은 제외. `result.json`에 로컬↔LB 기록은 남아 있음.
-
-제출 전 **전체규모 검증 필수** — 245,789행 가짜 test로 구조·시간·결측·범위 확인:
-
-```bash
-python scratchpad/verify_submit.py <zip>
-```
+죽은 축(001·002·004 `cond`·005 `depth8`·006 `grow_policy`·011)의 모델은 제외했습니다.
+`result.json`에 로컬↔LB 기록은 남아 있습니다.
 
 ## CLAUDE가 작성한 학습 기록 및 분석 파일
 
 1. [CLAUDE.md](CLAUDE.md) — 하드룰 + §7 재시도 금지 목록. 제출권 태우기 전에 필독
 2. [강의정리/08_Phase2_데이터_및_전략.md](강의정리/08_Phase2_데이터_및_전략.md) — 실험·제출 전기록
 3. [강의정리/09_피처분석_노트.md](강의정리/09_피처분석_노트.md) — 숨은 라벨 8종 복원
-4. [강의정리/10_KBO_시즌환경_분석.md](강의정리/10_KBO_시즌환경_분석.md) — 2025 base rate 0.477 추정
+4. [강의정리/10_KBO_시즌환경_분석.md](강의정리/10_KBO_시즌환경_분석.md) — 2025 base rate 추정
+   - ⚠️ 이 문서의 0.477은 KBO 공개자료 기반이라 **규정 2-3 외부 데이터 금지의 회색지대**입니다.
+     015부터는 train만으로 만든 추정치(0.4762)로 대체했습니다.
 
 - 위 문서들에 적힌 금지 사항을 반드시 지켜야할 필요는 없습니다. 그쪽에서 뭔가 성과가 나올지도 모르는 일이니까요.
 
@@ -109,6 +262,9 @@ python scratchpad/verify_submit.py <zip>
 - `submit.zip` = **최상위에 `model/` + `script.py` + `requirements.txt`**. 추가 최상위 폴더 있으면 설치오류
 - script.py는 `./data/test.csv`·`sample_submission.csv` 읽고 → `./output/submission.csv`
 - 서버: Ubuntu 22, Python **3.11**, L4 22.4GB, 6vCPU/28GB, **오프라인**. catboost/lightgbm/xgboost 기본 미설치 → requirements.txt에 명시
-- 추론 ≤10분, 설치 ≤10분, zip ≤10GB
+- 추론 ≤10분, 설치 ≤10분, zip ≤10GB, **1일 5회**
+- 오류 두 종류: 설치오류는 횟수가 차감되지 않지만, **script 실행 실패는 차감됩니다**
 - zip은 Python `zipfile`로 생성. `Compress-Archive`는 백슬래시 경로라 Linux에서 깨짐
 - 모델은 네이티브 포맷(`.cbm`/`.txt`). **pickle 금지** (로컬 3.14 vs 서버 3.11)
+- `script.py`가 import하는 모듈은 **전부 zip에 들어가야** 합니다. 빠지면 `ModuleNotFoundError`로 1회 차감입니다
+  ([verify_submit.py](test/verify_submit.py)가 자동으로 대조합니다)

@@ -22,6 +22,7 @@ test/runs/*/submit*.zip
 
 # 강의 원본 PDF 67MB — 각자 보유
 강의자료/
+기타자료/
 
 __pycache__/
 *.pyc

@@ -32,7 +32,13 @@ def main():
     cat_cols = meta["cat_cols"]
 
     # global_mean은 학습 때 쓴 값을 그대로 재사용해야 한다 (test에서 재계산 금지).
-    fe = engineer(test.drop(columns=[ID]), meta["global_mean"])
+    anchor = None
+    if meta.get("use_inseason"):
+        # 시즌내 분해 기준점(§5-10). 학습 때 train으로 만들어 zip에 실려 있다.
+        # 각 행은 자기 asof와 이 표만 쓴다 — test의 다른 행은 보지 않는다.
+        anchor = pd.read_csv(os.path.join(BASE, "model", "anchor.csv"),
+                             encoding="utf-8")
+    fe = engineer(test.drop(columns=[ID]), meta["global_mean"], anchor=anchor)
     if meta.get("use_cond"):
         # 조건부 표는 학습 때 train 전체로 만들어 zip에 실려 있다.
         # test에서 새로 계산하지 않는다 (test 내부 행 간 통계 사용 금지 규정).
@@ -43,18 +49,30 @@ def main():
     X = prepare(fe, feature_cols, cat_cols)
     pool = Pool(X, cat_features=[X.columns.get_loc(c) for c in cat_cols])
 
-    def avg_proba(prefix, seeds):
+    def make_pool(cols):
+        Z = prepare(fe, cols, cat_cols)
+        return Pool(Z, cat_features=[Z.columns.get_loc(c) for c in cat_cols])
+
+    def avg_proba(prefix, seeds, pl=None):
         ps = []
         for sd in seeds:
             m = CatBoostClassifier()
             m.load_model(os.path.join(BASE, "model", f"{prefix}{sd}.cbm"))
-            ps.append(m.predict_proba(pool)[:, 1])
+            ps.append(m.predict_proba(pl if pl is not None else pool)[:, 1])
         return np.mean(ps, axis=0)
 
     p = np.clip(avg_proba("model_", meta["seeds"]), 1e-6, 1 - 1e-6)
 
     off = meta.get("offset")
     if off:
+        # 보조모델(mr/wayoff)은 주모델과 다른 피처 집합으로 학습됐을 수 있다.
+        # 예: 013은 시즌내 분해 4열을 더 갖는데 보조모델은 009(003 피처)를
+        # 그대로 복사해 쓴다. 그때 주모델용 Pool을 재사용하면 CatBoost가
+        # 피처 불일치로 죽는다 → 보조 전용 Pool을 따로 만든다.
+        # engineer() 출력(fe)은 하나로 두고 열 부분집합만 다르게 뽑는다.
+        aux_pool = (make_pool(off["aux_feature_cols"])
+                    if off.get("aux_feature_cols") else None)
+
         # 실패모드 offset (08 문서 §5). y=0 ⟺ (M∪R) ⊎ W 를 이용해
         # 합에서 상쇄되던 성분 정보를 되돌린다.
         # a=1·d=0 고정 — 스케일/절편을 적합하면 그게 calibration이 되어
@@ -65,8 +83,9 @@ def main():
             return np.log(q / (1 - q))
 
         z = (logit(p)
-             + off["b"] * (logit(avg_proba("mr_", off["seeds"])) - off["mu_mr"])
-             + off["c"] * (logit(avg_proba("wayoff_", off["seeds"]))
+             + off["b"] * (logit(avg_proba("mr_", off["seeds"], aux_pool))
+                           - off["mu_mr"])
+             + off["c"] * (logit(avg_proba("wayoff_", off["seeds"], aux_pool))
                            - off["mu_wayoff"]))
         p = np.clip(1 / (1 + np.exp(-z)), 1e-6, 1 - 1e-6)
 

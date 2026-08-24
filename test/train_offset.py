@@ -36,16 +36,22 @@ from catboost import CatBoostClassifier, Pool
 from scipy.optimize import minimize
 
 sys.path.insert(0, "common")
-from features import engineer, CAT_COLS  # noqa: E402
+from features import engineer, build_anchor, CAT_COLS  # noqa: E402
 
-RUN = "010_offset_seeds7"
-BASE_RUN = "007_seeds7"               # 성공 모델을 가져올 run (재학습하지 않는다)
+RUN = "016_aux_inseason"
+BASE_RUN = "013_inseason"             # 성공 모델을 가져올 run (재학습하지 않는다)
 AUX_SEEDS = [42, 7, 2024]             # 보조모델 시드
-AUX_FROM = "009_offset"               # 보조모델을 복사해올 run. None이면 학습한다
+# None = 보조모델을 BASE_RUN의 피처로 새로 학습한다. 016은 이걸로 mr/wayoff에도
+# 시즌내 분해를 넣는다 (014까지는 009의 003-피처 복사본을 그대로 썼다).
+AUX_FROM = None
 # 계수 적합에 쓸 검증 예측(2019~23 학습 -> 2024)의 시드.
-# 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (007=7시드).
-FIT_SUCCESS_SEEDS = [42, 7, 2024, 99, 1, 123, 777]
-CACHE = "artifacts/auxpred"       # "aux"는 Windows 예약 장치명이라 git이 못 연다
+# 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (013=3시드).
+FIT_SUCCESS_SEEDS = [42, 7, 2024]
+# ⚠️ 성공모델 캐시는 BASE_RUN의 피처 구성으로 만든 것이어야 한다.
+# 013(시즌내 분해)은 make_valpred.py가 auxpred_ins에 새로 만든다.
+# mr/wayoff는 AUX_FROM(009, 003 피처)의 것이므로 기존 auxpred를 그대로 쓴다.
+CACHE = "artifacts/auxpred_ins"   # "aux"는 Windows 예약 장치명이라 git이 못 연다
+AUX_CACHE = "artifacts/auxpred"
 # 검증(2019~23 -> 2024)에서 얻은 조기중단 지점. 전체 재학습에 그대로 쓴다.
 BEST_ITER = {"mr": {42: 360, 7: 480, 2024: 404},
              "wayoff": {42: 351, 7: 354, 2024: 438}}
@@ -68,12 +74,21 @@ def bss(p, y):
     return brier, max(0.0, 100000 * (1 - brier / (r * (1 - r))))
 
 
-def fit_offset(df, y):
-    """캐시된 2024 검증 예측에서 b, c, mu 적합. 추가 학습 없음."""
-    use = {"success": FIT_SUCCESS_SEEDS, "mr": AUX_SEEDS, "wayoff": AUX_SEEDS}
-    P = {l: np.mean([np.load(os.path.join(CACHE, f"{l}_2024_{s}.npy"))
-                     for s in use[l]], axis=0)
-         for l in use}
+def fit_offset(df, y, P_mr=None, P_wayoff=None):
+    """2024 out-of-sample 예측에서 b, c, mu 적합.
+
+    mr/wayoff 예측은 두 경로로 온다:
+      - AUX_FROM 있음(복사): 그 모델이 실제로 냈던 캐시(AUX_CACHE)를 읽는다
+      - AUX_FROM 없음(재학습): 방금 검증 단계에서 나온 예측을 인자로 받는다
+        ← 옛 캐시를 쓰면 방금 학습한 모델과 다른 기준으로 계수가 잡힌다
+    """
+    P = {"success": np.mean(
+        [np.load(os.path.join(CACHE, f"success_2024_{s}.npy"))
+         for s in FIT_SUCCESS_SEEDS], axis=0)}
+    for name, given in (("mr", P_mr), ("wayoff", P_wayoff)):
+        P[name] = given if given is not None else np.mean(
+            [np.load(os.path.join(AUX_CACHE, f"{name}_2024_{s}.npy"))
+             for s in AUX_SEEDS], axis=0)
     L = pd.read_csv("recovered_labels.csv.gz")
     have = df[[ID]].merge(L, on=ID, how="left")["middle"].notna().values
     m = (df["season"] == 2024).values & have
@@ -117,13 +132,13 @@ def main():
 
     # 피처는 003과 완전히 같아야 한다 -> global_mean도 003의 저장값을 쓴다.
     gm = base_meta["global_mean"]
-    X = engineer(df.drop(columns=[ID, TARGET]), gm)
+    # 기반 run이 시즌내 분해를 쓰면 여기서도 같은 기준점을 만들어야 열이 맞는다.
+    anchor = build_anchor(df) if base_meta.get("use_inseason") else None
+    X = engineer(df.drop(columns=[ID, TARGET]), gm, anchor=anchor)
     X = X[base_meta["feature_cols"]]
     for c in CAT_COLS:
         X[c] = X[c].astype(str)
     ci = [X.columns.get_loc(c) for c in CAT_COLS]
-
-    b, c, mu = fit_offset(df, y)
 
     # 보조 라벨
     L = pd.read_csv("recovered_labels.csv.gz")
@@ -142,15 +157,43 @@ def main():
                                          f"{name}_{sd}.cbm"),
                             os.path.join(mdir, f"{name}_{sd}.cbm"))
         print(f" 보조 모델 {AUX_FROM} 에서 {2*len(AUX_SEEDS)}개 복사")
+        b, c, mu = fit_offset(df, y)
+        best_iters = BEST_ITER
     else:
-        print("\n--- 보조 모델 전체데이터 학습 ---", flush=True)
+        # 재학습 경로. 2단계로 간다 (train_local.py와 같은 구조):
+        #  ① 검증(2019~23 -> 2024)으로 best_iter를 **다시 찾는다**.
+        #     BEST_ITER 하드코딩은 003 피처로 찾은 값이라, 피처가 바뀌면 손실
+        #     지형도 바뀌어 그대로 쓰면 안 된다.
+        #  ② 그때 나온 2024 예측으로 b·c를 적합한다. 옛 캐시를 쓰면 방금 학습한
+        #     모델과 다른 기준이 된다.
+        tr_m = (df["season"] <= 2023).values & have
+        va_m = (df["season"] == 2024).values & have
+        print(f"\n--- 보조 모델 검증 (2019-2023 -> 2024) tr={tr_m.sum():,} "
+              f"va={va_m.sum():,} ---", flush=True)
+        best_iters = {"mr": {}, "wayoff": {}}
+        val_preds = {}
+        for name in ("mr", "wayoff"):
+            p_tr = Pool(X[tr_m], lab[name][tr_m], cat_features=ci)
+            p_va = Pool(X[va_m], lab[name][va_m], cat_features=ci)
+            ps = []
+            for sd in AUX_SEEDS:
+                mdl = CatBoostClassifier(**dict(
+                    PARAMS, random_seed=sd, early_stopping_rounds=100)).fit(
+                    p_tr, eval_set=p_va, use_best_model=True)
+                best_iters[name][sd] = max(mdl.get_best_iteration(), 1)
+                ps.append(mdl.predict_proba(p_va)[:, 1])
+                print(f" {name}_{sd} best_iter={best_iters[name][sd]}", flush=True)
+            val_preds[name] = np.mean(ps, axis=0)
+        b, c, mu = fit_offset(df, y, val_preds["mr"], val_preds["wayoff"])
+
+        print("\n--- 보조 모델 전체데이터 재학습 ---", flush=True)
         for name in ("mr", "wayoff"):
             p_all = Pool(X[have], lab[name][have], cat_features=ci)
             for sd in AUX_SEEDS:
-                it = BEST_ITER[name][sd]
-                m = CatBoostClassifier(**dict(PARAMS, random_seed=sd,
-                                              iterations=it)).fit(p_all)
-                m.save_model(os.path.join(mdir, f"{name}_{sd}.cbm"))
+                it = best_iters[name][sd]
+                mdl = CatBoostClassifier(**dict(PARAMS, random_seed=sd,
+                                                iterations=it)).fit(p_all)
+                mdl.save_model(os.path.join(mdir, f"{name}_{sd}.cbm"))
                 print(f" {name}_{sd} iter={it} 저장", flush=True)
 
     # 기반 run의 성공 모델을 그대로 복사 (재학습 금지 = 단일 변수 보장)
@@ -159,9 +202,28 @@ def main():
                     os.path.join(mdir, f"model_{sd}.cbm"))
     print(f" {BASE_RUN} 성공 모델 {len(base_meta['seeds'])}개 복사")
 
+    # 시즌내 분해 기준점 표도 같이 옮긴다 — 빠지면 추론에서 FileNotFoundError.
+    if base_meta.get("use_inseason"):
+        shutil.copy(os.path.join("runs", BASE_RUN, "model", "anchor.csv"),
+                    os.path.join(mdir, "anchor.csv"))
+        print(" 기준점 표 anchor.csv 복사")
+
     meta = dict(base_meta)
     meta["offset"] = {"seeds": AUX_SEEDS, "b": b, "c": c,
                       "mu_mr": mu[0], "mu_wayoff": mu[1]}
+    if AUX_FROM:
+        # 복사해온 보조모델은 그 run의 피처 집합으로 학습돼 있다. BASE_RUN이
+        # 열을 더 갖고 있으면(013 = 003 + 시즌내 4열) 주모델 Pool을 그대로
+        # 쓸 수 없다 → script.py가 이 목록으로 보조 전용 Pool을 만든다.
+        aux_meta = json.load(open(os.path.join("runs", AUX_FROM, "model",
+                                               "meta.json"), encoding="utf-8"))
+        if aux_meta["feature_cols"] != base_meta["feature_cols"]:
+            missing = [c_ for c_ in aux_meta["feature_cols"]
+                       if c_ not in base_meta["feature_cols"]]
+            assert not missing, f"보조모델 피처가 기반 run에 없다: {missing}"
+            meta["offset"]["aux_feature_cols"] = aux_meta["feature_cols"]
+            print(f" 보조모델 피처 {len(aux_meta['feature_cols'])}개 "
+                  f"(주모델 {len(base_meta['feature_cols'])}개) — 별도 Pool 사용")
     json.dump(meta, open(os.path.join(mdir, "meta.json"), "w", encoding="utf-8"))
 
     json.dump({"run": RUN, "note": (
@@ -171,7 +233,7 @@ def main():
         "base_run": BASE_RUN, "aux_from": AUX_FROM,
         "success_seeds": base_meta["seeds"], "aux_seeds": AUX_SEEDS,
         "params": PARAMS,
-        "offset": meta["offset"], "best_iters": BEST_ITER,
+        "offset": meta["offset"], "best_iters": best_iters,
         "lb_2025": None},
         open(os.path.join(out_dir, "result.json"), "w", encoding="utf-8"),
         ensure_ascii=False, indent=2)
