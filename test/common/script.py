@@ -38,7 +38,8 @@ def main():
         # 각 행은 자기 asof와 이 표만 쓴다 — test의 다른 행은 보지 않는다.
         anchor = pd.read_csv(os.path.join(BASE, "model", "anchor.csv"),
                              encoding="utf-8")
-    fe = engineer(test.drop(columns=[ID]), meta["global_mean"], anchor=anchor)
+    fe = engineer(test.drop(columns=[ID]), meta["global_mean"], anchor=anchor,
+                  priors=meta.get("rate_priors"))
     if meta.get("use_cond"):
         # 조건부 표는 학습 때 train 전체로 만들어 zip에 실려 있다.
         # test에서 새로 계산하지 않는다 (test 내부 행 간 통계 사용 금지 규정).

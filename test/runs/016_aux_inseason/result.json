@@ -1,0 +1,48 @@
+{
+  "run": "016_aux_inseason",
+  "note": "013_inseason 성공모델 그대로 + 실패모드 offset(mr/wayoff). 재학습 없음 = 단일 변수. a=1,d=0 고정(calibration 성분 제거), mu는 학습때 저장. 배포 유사 실측 2022계수->2024 = +26.6. 08 문서 §5",
+  "base_run": "013_inseason",
+  "aux_from": null,
+  "success_seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "aux_seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss"
+  },
+  "offset": {
+    "seeds": [
+      42,
+      7,
+      2024
+    ],
+    "b": -0.08347391309998092,
+    "c": 0.013809512155084282,
+    "mu_mr": -0.5138015842064135,
+    "mu_wayoff": -1.9891197849097313
+  },
+  "best_iters": {
+    "mr": {
+      "42": 354,
+      "7": 427,
+      "2024": 377
+    },
+    "wayoff": {
+      "42": 344,
+      "7": 461,
+      "2024": 379
+    }
+  },
+  "lb_2025": null
+}

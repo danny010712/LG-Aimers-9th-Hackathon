@@ -21,7 +21,7 @@ import pandas as pd
 from catboost import CatBoostClassifier, Pool
 
 sys.path.insert(0, "common")
-from features import engineer, build_anchor, CAT_COLS  # noqa: E402
+from features import engineer, build_anchor, rate_priors, CAT_COLS  # noqa: E402
 
 OUT = "artifacts/auxpred_ins"
 SEEDS = [42, 7, 2024]
@@ -42,7 +42,9 @@ def main():
 
     global_mean = float(y[tr].mean())
     anchor = build_anchor(df) if USE_INSEASON else None
-    X = engineer(df.drop(columns=[ID, TARGET]), global_mean, anchor=anchor)
+    priors = rate_priors(df[tr]) if USE_INSEASON else None
+    X = engineer(df.drop(columns=[ID, TARGET]), global_mean, anchor=anchor,
+                 priors=priors)
     for c in CAT_COLS:
         X[c] = X[c].astype(str)
     ci = [X.columns.get_loc(c) for c in CAT_COLS]

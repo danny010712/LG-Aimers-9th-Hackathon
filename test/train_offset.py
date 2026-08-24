@@ -38,12 +38,14 @@ from scipy.optimize import minimize
 sys.path.insert(0, "common")
 from features import engineer, build_anchor, CAT_COLS  # noqa: E402
 
-RUN = "016_aux_inseason"
-BASE_RUN = "013_inseason"             # 성공 모델을 가져올 run (재학습하지 않는다)
+RUN = "019_offset_inseason_all"
+BASE_RUN = "018_inseason_all"             # 성공 모델을 가져올 run (재학습하지 않는다)
 AUX_SEEDS = [42, 7, 2024]             # 보조모델 시드
-# None = 보조모델을 BASE_RUN의 피처로 새로 학습한다. 016은 이걸로 mr/wayoff에도
-# 시즌내 분해를 넣는다 (014까지는 009의 003-피처 복사본을 그대로 썼다).
-AUX_FROM = None
+# 🔴 009(003 피처 57열)를 복사한다. 016에서 보조모델을 BASE_RUN 피처로 재학습해봤으나
+# LB 1051.73 -> 1047.04로 **졌다**(017). 보조모델이 성공모델과 같은 입력을 보면
+# 예측이 닮아서 offset이 밀어줄 여지가 준다(계수 b −0.0990 -> −0.0835).
+# => 보조모델은 003 피처로 고정한다.
+AUX_FROM = "009_offset"
 # 계수 적합에 쓸 검증 예측(2019~23 학습 -> 2024)의 시드.
 # 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (013=3시드).
 FIT_SUCCESS_SEEDS = [42, 7, 2024]
@@ -134,7 +136,8 @@ def main():
     gm = base_meta["global_mean"]
     # 기반 run이 시즌내 분해를 쓰면 여기서도 같은 기준점을 만들어야 열이 맞는다.
     anchor = build_anchor(df) if base_meta.get("use_inseason") else None
-    X = engineer(df.drop(columns=[ID, TARGET]), gm, anchor=anchor)
+    X = engineer(df.drop(columns=[ID, TARGET]), gm, anchor=anchor,
+                 priors=base_meta.get("rate_priors"))
     X = X[base_meta["feature_cols"]]
     for c in CAT_COLS:
         X[c] = X[c].astype(str)

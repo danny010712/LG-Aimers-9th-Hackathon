@@ -1,0 +1,32 @@
+{
+  "run": "018_inseason_all",
+  "note": "013과 단일 변수: 시즌내 분해를 나머지 rate 열로 확장 (§5-10). 013은 success만 분해했다. reverse/middle/ball/strike(투수)와 middle(타자)도 같은 편차를 갖는다. 선형 프로브 증분(013 구성 위): reverse +13.8 / 타자middle +20.1 / ball +24.0 / strike +11.2 / middle +2.3 -> 전부 +73.7. ball이 큰 건 2024 ABS 도입으로 스트라이크존이 바뀐 탓으로 본다. 기준 = 013의 858.6 (동일 시드 42/7/2024, 그 외 전부 동일).",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 66,
+  "best_iters": [
+    193,
+    301,
+    293
+  ],
+  "val_2024": {
+    "brier": 0.247642891351364,
+    "skill": 0.008662831865870912,
+    "score": 866.2831865870912
+  },
+  "lb_2025": 1016.3860466907,
+  "verdict": "실수 제출로 얻은 관측 — raw(offset/shift 없음)로 팀원 최고 1012.70 상회"
+}

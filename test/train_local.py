@@ -21,22 +21,26 @@ import pandas as pd
 from catboost import CatBoostClassifier, Pool
 
 sys.path.insert(0, "common")
-from features import engineer, build_anchor, CAT_COLS  # noqa: E402
+from features import engineer, build_anchor, rate_priors, CAT_COLS  # noqa: E402
 import cond  # noqa: E402
 
 # ===== 이번 실행 설정 =====================================================
-RUN = "013_inseason"
-NOTE = ("003과 단일 변수: 시즌내 성적 분해 4열 추가 (§5-10). "
-        "asof는 시즌 리셋 없는 통산이라 리그 하락만큼 늘 위로 치우친다(2024 편차 +.0253). "
-        "직전 시즌 말 기준점을 빼서 그 시즌 성적만 남긴다 → 편차 +.0033. "
-        "1변수 예측력(평균보정 후) 238->361, 통산+prev5 조합 위 증분 +130. "
-        "기준 = 003의 783.3 (동일 시드 42/7/2024, 그 외 전부 동일).")
+RUN = "018_inseason_all"
+NOTE = ("013과 단일 변수: 시즌내 분해를 나머지 rate 열로 확장 (§5-10). "
+        "013은 success만 분해했다. reverse/middle/ball/strike(투수)와 middle(타자)도 "
+        "같은 편차를 갖는다. 선형 프로브 증분(013 구성 위): reverse +13.8 / 타자middle +20.1 / "
+        "ball +24.0 / strike +11.2 / middle +2.3 -> 전부 +73.7. "
+        "ball이 큰 건 2024 ABS 도입으로 스트라이크존이 바뀐 탓으로 본다. "
+        "기준 = 013의 858.6 (동일 시드 42/7/2024, 그 외 전부 동일).")
 SEEDS = [42, 7, 2024]                     # 003과 동일 — 시즌내 분해만 다르게 한다
 POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추니 +0.8 (§3-L)
 # cond는 교정된 채택기준에서 탈락 — 합계 +8.2는 죽은 fold 2023(+11.0)이 만든 것이고
 # 유효 fold만 세면 −2.8이다 (08 §3). depth도 6 유지 (d8 이득은 2024 단독).
 USE_COND = False
 USE_INSEASON = True                       # 시즌내 성적 분해 (§5-10)
+# offset 계수 적합용 검증 예측을 여기 쌓는다. 피처 구성이 바뀌면 캐시도 바뀌므로
+# train_offset.py의 CACHE와 반드시 같은 경로여야 한다.
+VALPRED_DIR = "artifacts/auxpred_ins"
 PARAMS = dict(
     iterations=2000, learning_rate=0.05, depth=6,
     thread_count=-1, verbose=0, eval_metric="Logloss",   # CatBoost는 -1 (0은 크래시)
@@ -90,7 +94,10 @@ def main():
     # 시즌내 분해용 기준점. season S 행에는 S−1 시즌 말 통산이 붙으므로
     # df 전체로 만들어도 누수가 구조적으로 불가능하다 (build_anchor 주석 참고).
     anchor = build_anchor(df) if USE_INSEASON else None
-    X = engineer(df.drop(columns=[ID, TARGET]), global_mean, anchor=anchor)
+    # rate prior도 global_mean과 같은 원칙 — 학습 구간에서만 계산해 meta에 저장한다.
+    priors = rate_priors(df[tr]) if USE_INSEASON else None
+    X = engineer(df.drop(columns=[ID, TARGET]), global_mean, anchor=anchor,
+                 priors=priors)
 
     # 조건부 개인기록: 학습 행에는 '그 시즌 이전'으로 만든 표를 붙인다.
     if USE_COND:
@@ -122,6 +129,20 @@ def main():
             tags.append(f"{gp[:3]}_{sd}")
             print(f" {tags[-1]:<10} iter={best_iters[-1]:<5} "
                   f"score~{bss(p, y[va])[2]:.1f}", flush=True)
+
+    # offset 계수 적합용 out-of-sample 캐시. 예전엔 make_valpred.py로 따로 뽑느라
+    # 같은 모델을 두 번 학습했다. 길이는 mr/wayoff 캐시와 맞춘다
+    # (season==2024 & 라벨 복원됨) — 안 맞추면 fit의 nll()에서 배열이 어긋난다.
+    if USE_INSEASON:
+        os.makedirs(VALPRED_DIR, exist_ok=True)
+        L_ = pd.read_csv("recovered_labels.csv.gz")
+        have_va = df[[ID]].merge(L_, on=ID, how="left")["middle"].notna().values[va]
+        for tag, p_ in zip(tags, val_preds):
+            np.save(os.path.join(VALPRED_DIR,
+                                 f"success_2024_{tag.split('_')[1]}.npy"),
+                    p_[have_va])
+        print(f" 검증 예측 {len(tags)}개 저장 -> {VALPRED_DIR} "
+              f"({have_va.sum():,}행)", flush=True)
 
     brier, skill, score = bss(np.mean(val_preds, axis=0), y[va])
     print(f"\n[VAL 2024 · {len(SEEDS)}시드 평균] Brier={brier:.6f} "
@@ -158,7 +179,8 @@ def main():
 
     json.dump({"seeds": tags, "feature_cols": feature_cols,
                "cat_cols": CAT_COLS, "global_mean": global_mean,
-               "use_cond": USE_COND, "use_inseason": USE_INSEASON},
+               "use_cond": USE_COND, "use_inseason": USE_INSEASON,
+               "rate_priors": priors},
               open(os.path.join(out_dir, "model", "meta.json"), "w",
                    encoding="utf-8"))
     json.dump({"run": RUN, "note": NOTE, "model": "catboost", "seeds": tags,

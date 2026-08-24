@@ -43,8 +43,8 @@ from scipy.optimize import brentq
 sys.path.insert(0, "common")
 from features import engineer, prepare, build_anchor  # noqa: E402
 
-RUN = "015_shift_inseason"
-BASE_RUN = "014_offset_inseason"
+RUN = "020_shift_inseason_all"
+BASE_RUN = "019_offset_inseason_all"
 FRACTION = 1.0            # 012에서 전량이 예측대로 적중(잔여 여지 +0.12)
 # 검증 예측 캐시 — 추정자 ②의 편향을 재는 데 쓴다 (BASE_RUN의 피처 구성으로 만든 것)
 VAL_CACHE = "artifacts/auxpred_ins"
@@ -110,7 +110,8 @@ def main():
         a = build_anchor(df)
         anchor = a[a["apply_season"] == 2024].copy()
         anchor["apply_season"] = 2025
-    fe = engineer(fake.drop(columns=[ID]), meta["global_mean"], anchor=anchor)
+    fe = engineer(fake.drop(columns=[ID]), meta["global_mean"], anchor=anchor,
+                  priors=meta.get("rate_priors"))
     print(f" 가짜 test {len(fake):,}행 구성 완료", flush=True)
 
     p = predict(mdir_base, meta, fe)
