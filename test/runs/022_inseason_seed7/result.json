@@ -1,0 +1,39 @@
+{
+  "run": "022_inseason_seed7",
+  "note": "021(LB 1057.00) 대비 단일 변수: 성공모델 시드 3 -> 7. 013 구성(61열, ins 4종) 그대로. 010에서 3->7이 로컬 +3.8 / LB +5.6이었다. 분산 감소는 fold-시즌과 무관하게 작동하는 유일한 축(CLAUDE.md 3장). 체인: 022 -> 023(offset) -> 024(shift) -> 025(platoon). | 025의 중간 단계 (성공모델 7시드). 최종 025가 −0.52로 기각됨.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_1",
+    "Sym_99",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 61,
+  "best_iters": [
+    278,
+    291,
+    249,
+    267,
+    276,
+    233,
+    246
+  ],
+  "val_2024": {
+    "brier": 0.24766560177603636,
+    "skill": 0.00857191995655271,
+    "score": 857.191995655271
+  },
+  "lb_2025": null
+}

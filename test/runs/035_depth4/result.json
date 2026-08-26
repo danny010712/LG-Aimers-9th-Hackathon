@@ -1,0 +1,31 @@
+{
+  "run": "035_depth4",
+  "note": "021(LB 1057.00) 대비 단일 변수: depth 6 -> 4. 031(d5) 체인의 연장. depth 8은 LB -34.2였고 반대 방향은 미측정. 얕은 트리가 미관측 시즌 외삽에 유리하다는 가설의 두 번째 점. 체인: 035 -> 036(offset) -> 037(shift) -> 038(platoon).",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 4,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 61,
+  "best_iters": [
+    448,
+    412,
+    300
+  ],
+  "val_2024": {
+    "brier": 0.24772114574791776,
+    "skill": 0.008349572351534218,
+    "score": 834.9572351534218
+  },
+  "lb_2025": null
+}

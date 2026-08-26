@@ -1,0 +1,42 @@
+{
+  "run": "040_role",
+  "note": "🔴 제출 금지. 주모델이 -11.0이고 하류 이득도 안 줄었다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 62,
+  "best_iters": [
+    195,
+    217,
+    253
+  ],
+  "val_2024": {
+    "seeds": {
+      "Sym_42": null,
+      "Sym_7": 846.4,
+      "Sym_2024": 841.0
+    },
+    "avg3": 847.9
+  },
+  "lb_2025": null,
+  "base_run": "013_inseason",
+  "submitted": false,
+  "verdict": {
+    "주모델_013대비": "-11.0 (859.0 -> 848.0)",
+    "platoon_이득": "28.49 -> 30.70 (변화 없음 = 정보 흡수 0)",
+    "결측행_Δ": "-15.0 (표 있는 행 -9.9보다 나쁘다 = 트리 분할 전역 오염)",
+    "결론": "role_ppg는 순수 노이즈 열이다. 레벨 보정(§2-P ②)도 트리 피처도 실패."
+  }
+}

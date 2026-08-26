@@ -27,18 +27,21 @@ BASE_CAT = ["top_bottom", "game_type", "base_state", "pitcher_hand",
 CAT_COLS = BASE_CAT + ["count_state"]
 
 
-# 분해할 (선수, rate 종류). `success`만 쓰던 것을 나머지 rate로 확장했다.
-# 근거(2024 fold, 선형 프로브에서 013 구성 위 증분): reverse +13.8 / 타자 middle +20.1 /
-# ball +24.0 / strike +11.2 / middle +2.3 → 전부 +73.7.
-# 🔥 `ball`이 큰 이유: 2024년 ABS(자동 볼판정) 도입으로 스트라이크존이 바뀌었다.
-#    통산 ball rate는 도입 전 기록에 묶여 있고 시즌내 분해가 그걸 걷어낸다.
-#    (같은 라벨이 offset **항**으로는 +0.2~0.9였다 — 이미 강한 모델 위라 증분이 없었을 뿐,
-#     **피처**로는 환경 신호를 나른다. 08 §5-4 vs §5-10.)
-# 구종 rate(fastball/breaking/offspeed)는 분모가 pitchmix_n으로 달라서 제외.
+# 분해할 (선수, rate 종류).
+# 🔴 `success` 2종만 쓴다 = run 013/015 구성(61열). **이게 최적이다.**
+#    나머지 rate로 넓힌 018/020(66열)은 LB에서 졌다: 1051.73 -> 1046.59 (**-5.14**).
+#    선형 프로브는 +73.7을 줬으나 실모델은 +7.7(0.10배)이었고 LB에선 음수였다 —
+#    5열이 서로 겹친다("이 선수의 올해 환경") = 정보는 안 늘고 용량만 늘었다.
+#    → 넓히지 말 것. 08 §5-10 / CLAUDE.md §7.
+# ⚠️ 이 목록을 바꾸면 anchor.csv 스키마(`s0_{key}`)가 같이 바뀐다. 옛 run 위에
+#    무언가를 얹을 때 목록이 어긋나면 추론이 KeyError로 죽는다(제출 1회 차감).
 ANCHOR_SPECS = [
-    ("pitcher", "success"), ("pitcher", "reverse"), ("pitcher", "middle"),
-    ("pitcher", "ball"), ("pitcher", "strike"),
-    ("batter", "success"), ("batter", "middle"),
+    ("pitcher", "success"),
+    ("batter", "success"),
+    # 아래 2종은 **주모델이 쓰지 않는다**. mr 보조모델(middle 합집합 reverse)에만
+    # 준다 — 자기 타깃의 시즌내 분해다(08 5-13). 주모델은 meta의 feature_cols
+    # 61개로만 뽑으므로 열이 늘어도 영향이 없다.
+    # 018/020이 이 열들을 **주모델**에 넣어 LB -5.14로 진 것과 용도가 다르다.
 ]
 ANCHOR_WHO = ("pitcher", "batter")
 

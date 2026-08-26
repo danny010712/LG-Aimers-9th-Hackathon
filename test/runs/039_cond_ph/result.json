@@ -1,0 +1,55 @@
+{
+  "run": "039_cond_ph",
+  "note": "🔴 **제출 금지.** 로컬 +13.9는 004가 로컬 +12.5 / LB -5.4였던 바로 그 자리다(09 §1-N ①: 새 정보가 아니면 베이스 무관하게 음수). 같은 정보를 021이 이미 offset으로 쓰고 있다. 그리고 이 zip은 주모델 단독(offset/shift/platoon 없음, 평균 0.4872)이라 021의 비교 대상 자체가 아니다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    278,
+    317,
+    258
+  ],
+  "val_2024": {
+    "seeds": {
+      "Sym_42": 868.5,
+      "Sym_7": 860.5,
+      "Sym_2024": 865.0
+    },
+    "avg3": 873.1
+  },
+  "lb_2025": null,
+  "base_run": "013_inseason",
+  "submitted": false,
+  "purpose": "진단 전용 — 파라미터화 vs 번들링 분리 (09 §2-L)",
+  "verdict": {
+    "주모델_013대비": "+13.9 (859.0 -> 872.9, 캐시 재계산 기준)",
+    "platoon_offset_이득": "013 위 +28.49 -> 039 위 +12.60 (b 2.253 -> 1.500)",
+    "최종_합계": "887.5 (offset 경로) vs 885.5 (피처 경로) = 사실상 동일",
+    "결론": "트리는 cond_ph를 쓸 수 있다 => 004(LB -5.4)의 패배는 **번들링**(죽은 표 3개 희석)이 원인이 맞다. 그러나 두 경로가 같은 정보를 같은 크기로 나르므로(최종값 동일) 죽은 축을 되살리는 경로는 아니다."
+  },
+  "verify": {
+    "rows": 245789,
+    "missing": 0,
+    "range": [
+      0.3316,
+      0.6347
+    ],
+    "mean": 0.4872,
+    "infer_sec": 6.4,
+    "passed": true,
+    "note": "구조는 정상. 제출하지 않을 뿐."
+  }
+}

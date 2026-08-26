@@ -43,11 +43,11 @@ from scipy.optimize import brentq
 sys.path.insert(0, "common")
 from features import engineer, prepare, build_anchor  # noqa: E402
 
-RUN = "020_shift_inseason_all"
-BASE_RUN = "019_offset_inseason_all"
+RUN = "037_shift_d4"
+BASE_RUN = "036_offset_d4"
 FRACTION = 1.0            # 012에서 전량이 예측대로 적중(잔여 여지 +0.12)
 # 검증 예측 캐시 — 추정자 ②의 편향을 재는 데 쓴다 (BASE_RUN의 피처 구성으로 만든 것)
-VAL_CACHE = "artifacts/auxpred_ins"
+VAL_CACHE = "artifacts/auxpred_ins4"
 VAL_SEEDS = [42, 7, 2024]
 DATA = "data/train.csv"
 COMMON = "common"
@@ -78,13 +78,22 @@ def predict(mdir, meta, fe):
     off = meta.get("offset")
     if off:
         # 보조모델은 피처 집합이 다를 수 있다 (013=61열 vs 009 보조=57열).
-        cols = off.get("aux_feature_cols") or meta["feature_cols"]
-        Xa = prepare(fe, cols, meta["cat_cols"])
-        pa = Pool(Xa, cat_features=[Xa.columns.get_loc(c)
-                                    for c in meta["cat_cols"]])
+        # 보조 둘이 서로 다른 열을 쓸 수 있다 — mr에만 자기 타깃의 시즌내 분해를
+        # 준 경우(028). 옛 meta는 aux_feature_cols 하나뿐이므로 그때는 둘 다 그것.
+        # ⚠️ script.py의 같은 로직과 반드시 일치시킬 것 — 여기가 추론 경로 복제다.
+        _dflt = off.get("aux_feature_cols") or meta["feature_cols"]
+
+        def _pool(cols):
+            Xa = prepare(fe, cols, meta["cat_cols"])
+            return Pool(Xa, cat_features=[Xa.columns.get_loc(c)
+                                          for c in meta["cat_cols"]])
+
+        pa_mr = _pool(off.get("mr_feature_cols") or _dflt)
+        pa_wo = _pool(off.get("wayoff_feature_cols") or _dflt)
         z = (logit(p)
-             + off["b"] * (logit(avg("mr_", off["seeds"], pa)) - off["mu_mr"])
-             + off["c"] * (logit(avg("wayoff_", off["seeds"], pa))
+             + off["b"] * (logit(avg("mr_", off["seeds"], pa_mr))
+                           - off["mu_mr"])
+             + off["c"] * (logit(avg("wayoff_", off["seeds"], pa_wo))
                            - off["mu_wayoff"]))
         p = np.clip(sigmoid(z), 1e-6, 1 - 1e-6)
     return p
@@ -118,6 +127,9 @@ def main():
     cur = float(p.mean())
 
     # ① 리그 성공률 선형외삽 (train만)
+    #    ⚠️ R/F 분리 외삽(성분별)을 run 026으로 만들어봤으나 **기각**했다.
+    #    LB 역산 실제 2025 base rate 0.4764 기준으로 성분별 0.4728(오차 .0036)이
+    #    현행 ①②평균 0.4762(오차 .0002)보다 나쁘다. 08 §5-14.
     lg = df.groupby("season")[TARGET].mean()
     sl, ic = np.polyfit(lg.index.values.astype(float), lg.values, 1)
     est1 = float(sl * 2025 + ic)

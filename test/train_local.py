@@ -23,26 +23,35 @@ from catboost import CatBoostClassifier, Pool
 sys.path.insert(0, "common")
 from features import engineer, build_anchor, rate_priors, CAT_COLS  # noqa: E402
 import cond  # noqa: E402
+import role  # noqa: E402
 
 # ===== 이번 실행 설정 =====================================================
-RUN = "018_inseason_all"
-NOTE = ("013과 단일 변수: 시즌내 분해를 나머지 rate 열로 확장 (§5-10). "
-        "013은 success만 분해했다. reverse/middle/ball/strike(투수)와 middle(타자)도 "
-        "같은 편차를 갖는다. 선형 프로브 증분(013 구성 위): reverse +13.8 / 타자middle +20.1 / "
-        "ball +24.0 / strike +11.2 / middle +2.3 -> 전부 +73.7. "
-        "ball이 큰 건 2024 ABS 도입으로 스트라이크존이 바뀐 탓으로 본다. "
-        "기준 = 013의 858.6 (동일 시드 42/7/2024, 그 외 전부 동일).")
-SEEDS = [42, 7, 2024]                     # 003과 동일 — 시즌내 분해만 다르게 한다
+RUN = "040_role"
+NOTE = ("013 대비 단일 변수: 투수 역할(등판당 투구수) 표를 트리 피처로 추가. "
+        "asof는 통산 누적만 주고 경기당 소화량은 train 행을 봐야 나온다 = 모델이 "
+        "도달 못 하는 값(시즌내 분해와 같은 구조). 013 주모델 859.0이 비교 기준.")
+SEEDS = [42, 7, 2024]
 POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추니 +0.8 (§3-L)
 # cond는 교정된 채택기준에서 탈락 — 합계 +8.2는 죽은 fold 2023(+11.0)이 만든 것이고
 # 유효 fold만 세면 −2.8이다 (08 §3). depth도 6 유지 (d8 이득은 2024 단독).
+# 🔥 cond 재개 — 단, **살아있는 ph 표 하나만**.
+# 004는 4표 번들(pc·ph·bc·pi)로 줘서 LB -5.4였고, 08 §5-12가 그 패배를
+# "죽은 표 3개가 살아있는 1개를 희석"으로 설명했다. 그런데 같은 정보를
+# offset으로 주니 021에서 +5.27이었다. **번들링이 원인인지 파라미터화가
+# 원인인지 분리된 적이 없다.** ph만 주면 갈린다.
 USE_COND = False
+COND_ONLY = ["ph"]        # None이면 SPECS 전부
+# 🔥 투수 역할(등판당 투구수) 표 — 09 §2-P.
+# 레벨 보정 형태로는 전이가 갈렸다(2023->2024 -8.08 / 2022->2024 +10.86, 진폭 부호 1/3).
+# 여기서는 **트리 피처**로 준다. 039가 보인 대로 형태가 결과를 바꿀 수 있고,
+# 트리 피처는 카운트·상황과 교호작용할 수 있어 진폭 문제를 안 탄다.
+USE_ROLE = True
 USE_INSEASON = True                       # 시즌내 성적 분해 (§5-10)
 # offset 계수 적합용 검증 예측을 여기 쌓는다. 피처 구성이 바뀌면 캐시도 바뀌므로
 # train_offset.py의 CACHE와 반드시 같은 경로여야 한다.
-VALPRED_DIR = "artifacts/auxpred_ins"
+VALPRED_DIR = "artifacts/auxpred_role"
 PARAMS = dict(
-    iterations=2000, learning_rate=0.05, depth=6,
+    iterations=2000, learning_rate=0.05, depth=6,   # 021과 동일. 단일 변수는 cond_ph
     thread_count=-1, verbose=0, eval_metric="Logloss",   # CatBoost는 -1 (0은 크래시)
     early_stopping_rounds=100,
 )
@@ -67,7 +76,8 @@ def build_zip(out_dir):
     써서 Linux 평가서버에서 깨질 수 있다."""
     path = os.path.join(out_dir, f"submit{RUN.split('_')[0]}.zip")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in ("script.py", "requirements.txt", "features.py", "cond.py"):
+        for f in ("script.py", "requirements.txt", "features.py", "cond.py",
+                  "role.py"):
             z.write(os.path.join(COMMON, f), f)
         model_dir = os.path.join(out_dir, "model")
         for f in sorted(os.listdir(model_dir)):
@@ -103,9 +113,21 @@ def main():
     if USE_COND:
         print(" 조건부 표 생성 (시즌별 과거만)...", flush=True)
         C = cond.build_training_columns(df)
-        for c in cond.COND_COLS:
+        use = ([c for c in cond.COND_COLS
+                if any(c == "cond_" + n or c == "cond_" + n + "_dev"
+                       for n in COND_ONLY)] if COND_ONLY else list(cond.COND_COLS))
+        assert use, COND_ONLY
+        for c in use:
             X[c] = C[c].values
-        print(f" cond 결측률 {X[cond.COND_COLS].isna().mean().mean()*100:.1f}%")
+        print(f" cond 열 {use}  결측률 {X[use].isna().mean().mean()*100:.1f}%")
+
+    if USE_ROLE:
+        print(" 역할 표 생성 (시즌별 과거만)...", flush=True)
+        R = role.build_training_columns(df)
+        for c in role.ROLE_COLS:
+            X[c] = R[c].values
+        print(f" role 열 {role.ROLE_COLS}  결측률 "
+              f"{X[role.ROLE_COLS].isna().mean().mean()*100:.1f}%", flush=True)
 
     feature_cols = list(X.columns)
     for c in CAT_COLS:
@@ -168,6 +190,11 @@ def main():
                      index=False, encoding="utf-8")
         print(f" cond 표 {len(cond.SPECS)}개 저장")
 
+    if USE_ROLE:
+        role.build_table(df).to_csv(os.path.join(out_dir, "model", "role.csv"),
+                                    index=False, encoding="utf-8")
+        print(" role 표 저장 (train 전체)")
+
     if USE_INSEASON:
         # 2025 행에 붙일 기준점만 싣는다 (학습용 과거 시즌 행은 추론에 안 쓴다).
         last = int(df["season"].max()) + 1
@@ -180,6 +207,7 @@ def main():
     json.dump({"seeds": tags, "feature_cols": feature_cols,
                "cat_cols": CAT_COLS, "global_mean": global_mean,
                "use_cond": USE_COND, "use_inseason": USE_INSEASON,
+               "use_role": USE_ROLE,
                "rate_priors": priors},
               open(os.path.join(out_dir, "model", "meta.json"), "w",
                    encoding="utf-8"))

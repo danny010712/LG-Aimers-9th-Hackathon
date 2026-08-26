@@ -71,8 +71,13 @@ def main():
         # 그대로 복사해 쓴다. 그때 주모델용 Pool을 재사용하면 CatBoost가
         # 피처 불일치로 죽는다 → 보조 전용 Pool을 따로 만든다.
         # engineer() 출력(fe)은 하나로 두고 열 부분집합만 다르게 뽑는다.
-        aux_pool = (make_pool(off["aux_feature_cols"])
-                    if off.get("aux_feature_cols") else None)
+        # 보조 둘이 서로 다른 열을 쓸 수 있다 — mr에만 자기 타깃의 시즌내 분해를
+        # 준 경우(027). 옛 meta는 aux_feature_cols 하나만 갖고 있으므로
+        # 그때는 둘 다 그것을 쓴다(하위 호환).
+        _dflt = off.get("aux_feature_cols")
+        _cols = {"mr": off.get("mr_feature_cols") or _dflt,
+                 "wayoff": off.get("wayoff_feature_cols") or _dflt}
+        aux_pool = {k: (make_pool(v) if v else None) for k, v in _cols.items()}
 
         # 실패모드 offset (08 문서 §5). y=0 ⟺ (M∪R) ⊎ W 를 이용해
         # 합에서 상쇄되던 성분 정보를 되돌린다.
@@ -84,9 +89,11 @@ def main():
             return np.log(q / (1 - q))
 
         z = (logit(p)
-             + off["b"] * (logit(avg_proba("mr_", off["seeds"], aux_pool))
+             + off["b"] * (logit(avg_proba("mr_", off["seeds"],
+                                           aux_pool["mr"]))
                            - off["mu_mr"])
-             + off["c"] * (logit(avg_proba("wayoff_", off["seeds"], aux_pool))
+             + off["c"] * (logit(avg_proba("wayoff_", off["seeds"],
+                                           aux_pool["wayoff"]))
                            - off["mu_wayoff"]))
         p = np.clip(1 / (1 + np.exp(-z)), 1e-6, 1 - 1e-6)
 
@@ -97,6 +104,22 @@ def main():
         # (test 평균을 보고 정하면 규정 위반).
         p = np.clip(1 / (1 + np.exp(-(np.log(p / (1 - p)) + shift))), 1e-6, 1 - 1e-6)
 
+    plat = meta.get("platoon")
+    if plat:
+        # 투수 좌우편차 offset (08 §5-12). 표는 학습 때 train으로 만들어 zip에 실려 있다.
+        # 각 행은 자기 pitcher_id와 자기 좌우 조합만 본다 — test의 다른 행은 안 쓴다.
+        # 표는 사용량 가중 평균 0으로 중심화돼 있어 앞단 logit_shift를 흐트러뜨리지 않는다.
+        tab = pd.read_csv(os.path.join(BASE, "model", "platoon.csv"),
+                          encoding="utf-8")
+        key = pd.DataFrame({
+            "pitcher_id": test["pitcher_id"].values,
+            "plat": (test["pitcher_hand"] == test["batter_hand"]).astype(int).values})
+        s = key.merge(tab, on=["pitcher_id", "plat"],
+                      how="left")["split"].fillna(0.0).values
+        assert len(s) == len(p)
+        p = np.clip(1 / (1 + np.exp(-(np.log(p / (1 - p)) + plat["b"] * s))),
+                    1e-6, 1 - 1e-6)
+
     pred_map = dict(zip(test[ID], p))
     sub[TARGET] = [pred_map.get(rid, 0.5) for rid in sub[ID]]
 
@@ -104,6 +127,7 @@ def main():
     sub.to_csv("./output/submission.csv", index=False, encoding="utf-8")
     print(f"Saved ./output/submission.csv rows={len(sub)} "
           f"seeds={len(meta['seeds'])} offset={'Y' if off else 'N'} "
+          f"platoon={'Y' if plat else 'N'} "
           f"mean={p.mean():.4f}")
 
 
