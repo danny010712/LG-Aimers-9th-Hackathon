@@ -1,0 +1,31 @@
+{
+  "run": "049_condphbh",
+  "note": "044(LB 1062.55) 대비 단일 변수: cond_bh(타자x투수손 = 타자 플래툰) 추가. 지금까지 잰 16개 축이 전부 투수x상황이었다 — 표의 **주체를 타자로** 바꾼 첫 표. 지속성 corr +0.3657(MINN30)/+0.4563(MINN100)로 ph(+0.3854/+0.4026) 동급 이상이고, pc/bc/pi(+0.105/+0.059/+0.024)와 명확히 갈린다. asof_batter_*는 3열뿐이라 이 정보가 어디에도 없다. M=50 유지(단일 변수) — M=270이면 corr +0.4402, 다음 노브.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    295,
+    261,
+    282
+  ],
+  "val_2024": {
+    "brier": 0.24763105435382388,
+    "skill": 0.00871021645081338,
+    "score": 871.021645081338
+  },
+  "lb_2025": null
+}

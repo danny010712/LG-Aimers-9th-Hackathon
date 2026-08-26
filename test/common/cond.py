@@ -16,14 +16,30 @@ import pandas as pd
 TARGET = "control_success"
 M = 50                                  # 스무딩 강도 (표본 M개에서 반반)
 
+# 🔥 표마다 다른 타깃을 쓸 수 있다 (기본은 control_success).
+#    복원 라벨(recovered_labels.csv.gz)을 머지한 프레임을 넘겨야 한다.
+#    ⚠️ 복원 라벨은 **현재 투구의 결과**다 — 모델 입력 X에 절대 들어가면 안 된다.
+#       cond 함수는 cond_* 열만 반환하므로 표 생성용 프레임만 따로 넘기면 안전하다.
+TARGET_OF = {"phb": "breaking"}
+
 # (이름, 그룹키, 사전분포키)
 SPECS = [
     ("pc", ["pitcher_id", "count_state"], "pitcher_id"),
     ("ph", ["pitcher_id", "batter_hand"], "pitcher_id"),
     ("bc", ["batter_id", "count_state"], "batter_id"),
     ("pi", ["pitcher_id", "xinn"], "pitcher_id"),
+    # 🔥 2026-08-26 추가 — 표의 **주체를 타자로** 바꾼 첫 표(타자 플래툰).
+    #    지금까지 잰 16개 축이 전부 `투수 x 상황`이었다.
+    #    지속성 corr +0.3657(MINN30) / **+0.4563**(MINN100) = ph(+0.3854/+0.4026) 동급 이상.
+    #    asof_batter_*는 n/success_rate/middle_rate 3열뿐이라 이 정보가 어디에도 없다.
+    ("bh", ["batter_id", "pitcher_hand"], "batter_id"),
+    # 🔥 같은 키(투수x타자손)에 타깃만 구종으로. 지속 corr +0.832, 지속진폭 0.4024
+    #    (success 0.0324의 12배). 주모델은 asof_pitcher_breaking_rate = 통산 주변값만
+    #    가지고 손별 분해는 없다. 09 §3-E(구종 오라클 +160.5)의 합법 대리변수.
+    ("phb", ["pitcher_id", "batter_hand"], "pitcher_id"),
 ]
-COND_COLS = ["cond_" + n for n, _, _ in SPECS] + ["cond_pc_dev", "cond_ph_dev"]
+COND_COLS = ["cond_" + n for n, _, _ in SPECS] + ["cond_pc_dev", "cond_ph_dev",
+                                             "cond_bh_dev", "cond_phb_dev"]
 
 
 def add_keys(d):
@@ -38,13 +54,14 @@ def add_keys(d):
 def build_tables(hist):
     """hist(타깃 포함 과거 행)에서 SPECS별 스무딩 성공률 표를 만든다."""
     hist = add_keys(hist)
-    gm = hist[TARGET].mean()
+    gms = {n: hist[TARGET_OF.get(n, TARGET)].mean() for n, _, _ in SPECS}
     tables = {}
     for name, keys, prior in SPECS:
-        g = hist.groupby(keys)[TARGET].agg(["sum", "count"])
-        pr = hist.groupby(prior)[TARGET].mean().rename("prior")
+        tg = TARGET_OF.get(name, TARGET)
+        g = hist.groupby(keys)[tg].agg(["sum", "count"])
+        pr = hist.groupby(prior)[tg].mean().rename("prior")
         g = g.join(pr, on=prior)
-        g["prior"] = g["prior"].fillna(gm)
+        g["prior"] = g["prior"].fillna(gms[name])
         v = (g["sum"] + M * g["prior"]) / (g["count"] + M)
         tables[name] = v.rename("cond_" + name).reset_index()
     return tables
@@ -58,6 +75,10 @@ def apply_tables(d, tables):
         d = d.merge(t, on=keys, how="left")
     d["cond_pc_dev"] = d["cond_pc"] - d["asof_pitcher_success_rate"]
     d["cond_ph_dev"] = d["cond_ph"] - d["asof_pitcher_success_rate"]
+    # 타자 기준선 대비 편차 — 투수 쪽 두 열과 대칭.
+    d["cond_bh_dev"] = d["cond_bh"] - d["asof_batter_success_rate"]
+    # 통산 변화구 비율을 뺀 나머지 = "이 손 타자에게 평소보다 얼마나 더/덜"
+    d["cond_phb_dev"] = d["cond_phb"] - d["asof_pitcher_breaking_rate"]
     return d.drop(columns=["count_state_x"], errors="ignore")
 
 

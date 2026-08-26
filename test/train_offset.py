@@ -39,8 +39,8 @@ sys.path.insert(0, "common")
 from features import (engineer, build_anchor, rate_priors,  # noqa: E402
                       CAT_COLS)
 
-RUN = "036_offset_d4"
-BASE_RUN = "035_depth4"             # 성공 모델을 가져올 run (재학습하지 않는다)
+RUN = "054_offset_phb"
+BASE_RUN = "053_condphb"             # 성공 모델을 가져올 run (재학습하지 않는다)
 AUX_SEEDS = [42, 7, 2024]             # 보조모델 시드
 # 🔴 009(003 피처 57열)를 복사한다. 016에서 보조모델을 BASE_RUN 피처로 재학습해봤으나
 # LB 1051.73 -> 1047.04로 **졌다**(017). 보조모델이 성공모델과 같은 입력을 보면
@@ -53,18 +53,18 @@ AUX_COPY_FROM = "009_offset"   # 재학습하지 않는 보조는 여기서 복�
 #    기여가 사실상 0이라(5-4 O2a) 개선 여지가 애초에 mr 쪽뿐이다.
 #    🔴 017과 방향이 반대다: 017은 보조에 **주모델 피처**를 줘서 예측이 닮았고
 #    (b -0.0990 -> -0.0835), 여기는 주모델에 **없는** 열을 줘서 더 멀어지게 한다.
-RETRAIN_AUX = ["mr"]
+RETRAIN_AUX = []          # 021 체인과 동일 — 보조는 009 복사만
 MR_EXTRA_COLS = ["ins_pitcher_middle_rate", "ins_pitcher_reverse_rate"]
 # 재학습한 보조의 2024 검증 예측을 여기 쌓는다. build_platoon.py가 offset을
 # 재현하는 데 필요하다 — 옛 캐시(009)를 읽으면 계수가 어긋난다.
-AUX_OUT = "artifacts/auxpred_mr"
+AUX_OUT = "artifacts/auxpred_phb_aux"
 # 계수 적합에 쓸 검증 예측(2019~23 학습 -> 2024)의 시드.
 # 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (013=3시드).
 FIT_SUCCESS_SEEDS = [42, 7, 2024]
 # ⚠️ 성공모델 캐시는 BASE_RUN의 피처 구성으로 만든 것이어야 한다.
 # 013(시즌내 분해)은 make_valpred.py가 auxpred_ins에 새로 만든다.
 # mr/wayoff는 AUX_FROM(009, 003 피처)의 것이므로 기존 auxpred를 그대로 쓴다.
-CACHE = "artifacts/auxpred_ins4"   # "aux"는 Windows 예약 장치명이라 git이 못 연다
+CACHE = "artifacts/auxpred_condphb"   # "aux"는 Windows 예약 장치명이라 git이 못 연다
 AUX_CACHE = "artifacts/auxpred"
 # 검증(2019~23 -> 2024)에서 얻은 조기중단 지점. 전체 재학습에 그대로 쓴다.
 BEST_ITER = {"mr": {42: 360, 7: 480, 2024: 404},
@@ -137,8 +137,11 @@ def main():
     assert len(base_meta["seeds"]) == len(FIT_SUCCESS_SEEDS), \
         "계수 적합 시드 수가 기반 run의 성공모델 개수와 다르다"
     # 003의 meta는 use_cond 키가 생기기 전에 만들어졌다(None). 실제 열로 확인한다.
-    assert not any(c.startswith("cond_") for c in base_meta["feature_cols"]), \
-        "기반 run에 cond 열이 있다"
+    # 보조모델은 AUX_COPY_FROM(009=57열)만 쓰므로 주모델에 cond가 있어도 무방하다.
+    # 다만 그때는 meta에 use_cond가 서 있어야 script.py가 표를 붙인다.
+    _has_cond = any(c.startswith("cond_") for c in base_meta["feature_cols"])
+    assert not _has_cond or base_meta.get("use_cond"), (
+        "기반 run에 cond 열이 있는데 meta['use_cond']가 꺼져 있다 — 추론 KeyError")
 
     print(" Load train...", flush=True)
     df = pd.read_csv(DATA, encoding="utf-8-sig")
@@ -288,6 +291,17 @@ def main():
                     encoding="utf-8")
         print(f" 기준점 표 재생성 {len(_new):,}행 — 주모델 값 동일 확인 "
               f"(s0_success 최대차 {_d:.1e})")
+
+    # cond 표는 주모델과 함께 움직인다. 안 옮기면 추론에서 파일이 없다.
+    if _has_cond:
+        _src = os.path.join("runs", BASE_RUN, "model")
+        _n = 0
+        for _f in sorted(os.listdir(_src)):
+            if _f.startswith("cond_") and _f.endswith(".csv"):
+                shutil.copy(os.path.join(_src, _f), os.path.join(mdir, _f))
+                _n += 1
+        assert _n, f"use_cond인데 {_src}에 cond_*.csv가 없다"
+        print(f" cond 표 {_n}개 복사 ({BASE_RUN} -> {RUN})")
 
     meta = dict(base_meta)
     meta["offset"] = {"seeds": AUX_SEEDS, "b": b, "c": c,

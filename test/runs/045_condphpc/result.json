@@ -1,0 +1,31 @@
+{
+  "run": "045_condphpc",
+  "note": "044(LB 1062.55) 대비 단일 변수: cond_pc(투수x볼카운트) 표를 트리 피처로 추가. 044가 로컬 -2.9 / LB +5.55로 부호를 뒤집으며 증명한 것 — 로컬은 platoon 이득을 2024 in-year 투수분할 CV로 재서 offset 경로에 유리하게 편향돼 있다(09 §2-R). 004 번들에서 죽었다던 pc/bc/pi 세 표의 사망 판정도 같은 편향 위에 있다. pc부터 단독으로 다시 잰다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    303,
+    225,
+    294
+  ],
+  "val_2024": {
+    "brier": 0.24763350284340338,
+    "skill": 0.008700414922844124,
+    "score": 870.0414922844124
+  },
+  "lb_2025": null
+}

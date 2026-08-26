@@ -1,0 +1,31 @@
+{
+  "run": "041_condph",
+  "note": "013 대비 단일 변수: cond_ph(투수x타자손) 표를 **트리 피처**로 추가. 039가 로컬로 'offset과 대체재'라 판정했으나(887.5 vs 885.5) CLAUDE.md §5는 **로컬에서 잰 독립성·비대체성이 LB로 전이되지 않는다**고 명시한다(021이 베이스 4개에서 확인하고도 배율 0.26). LB 근접점은 004의 4표 번들(-5.4)뿐이고 ph 단독은 LB에서 잰 적이 없다. 하방 0 · 슬롯 35발이라 쏜다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    278,
+    317,
+    258
+  ],
+  "val_2024": {
+    "brier": 0.24762579176551064,
+    "skill": 0.008731283073671103,
+    "score": 873.1283073671103
+  },
+  "lb_2025": null
+}

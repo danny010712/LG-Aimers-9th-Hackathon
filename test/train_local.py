@@ -26,10 +26,12 @@ import cond  # noqa: E402
 import role  # noqa: E402
 
 # ===== 이번 실행 설정 =====================================================
-RUN = "040_role"
-NOTE = ("013 대비 단일 변수: 투수 역할(등판당 투구수) 표를 트리 피처로 추가. "
-        "asof는 통산 누적만 주고 경기당 소화량은 train 행을 봐야 나온다 = 모델이 "
-        "도달 못 하는 값(시즌내 분해와 같은 구조). 013 주모델 859.0이 비교 기준.")
+RUN = "053_condphb"
+NOTE = ("044(LB 1062.55) 대비 단일 변수: cond_phb — ph와 **같은 키**(투수x타자손)에 "
+        "타깃만 **구종(breaking)**으로 바꾼 표. 지속 corr **+0.832**, 지속진폭 **0.4024**로 "
+        "success(0.0324)의 12배. 주모델은 asof_pitcher_breaking_rate = 통산 주변값만 갖고 "
+        "손별 분해가 없다. _dev 열이 통산분을 빼므로 중복 아님. 09 §3-E 구종 오라클 "
+        "+160.5의 합법 대리변수 — 기존 시도(주변값·시즌내 앵커)와 형태가 다르다.")
 SEEDS = [42, 7, 2024]
 POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추니 +0.8 (§3-L)
 # cond는 교정된 채택기준에서 탈락 — 합계 +8.2는 죽은 fold 2023(+11.0)이 만든 것이고
@@ -39,17 +41,17 @@ POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추�
 # "죽은 표 3개가 살아있는 1개를 희석"으로 설명했다. 그런데 같은 정보를
 # offset으로 주니 021에서 +5.27이었다. **번들링이 원인인지 파라미터화가
 # 원인인지 분리된 적이 없다.** ph만 주면 갈린다.
-USE_COND = False
-COND_ONLY = ["ph"]        # None이면 SPECS 전부
+USE_COND = True
+COND_ONLY = ["ph", "phb"]        # None이면 SPECS 전부
 # 🔥 투수 역할(등판당 투구수) 표 — 09 §2-P.
 # 레벨 보정 형태로는 전이가 갈렸다(2023->2024 -8.08 / 2022->2024 +10.86, 진폭 부호 1/3).
 # 여기서는 **트리 피처**로 준다. 039가 보인 대로 형태가 결과를 바꿀 수 있고,
 # 트리 피처는 카운트·상황과 교호작용할 수 있어 진폭 문제를 안 탄다.
-USE_ROLE = True
+USE_ROLE = False
 USE_INSEASON = True                       # 시즌내 성적 분해 (§5-10)
 # offset 계수 적합용 검증 예측을 여기 쌓는다. 피처 구성이 바뀌면 캐시도 바뀌므로
 # train_offset.py의 CACHE와 반드시 같은 경로여야 한다.
-VALPRED_DIR = "artifacts/auxpred_role"
+VALPRED_DIR = "artifacts/auxpred_condphb"
 PARAMS = dict(
     iterations=2000, learning_rate=0.05, depth=6,   # 021과 동일. 단일 변수는 cond_ph
     thread_count=-1, verbose=0, eval_metric="Logloss",   # CatBoost는 -1 (0은 크래시)
@@ -76,8 +78,10 @@ def build_zip(out_dir):
     써서 Linux 평가서버에서 깨질 수 있다."""
     path = os.path.join(out_dir, f"submit{RUN.split('_')[0]}.zip")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in ("script.py", "requirements.txt", "features.py", "cond.py",
-                  "role.py"):
+        files = ["script.py", "requirements.txt", "features.py", "cond.py"]
+        if USE_ROLE:
+            files.append("role.py")   # 안 쓰면 싣지 않는다 (verify_submit 허용목록)
+        for f in files:
             z.write(os.path.join(COMMON, f), f)
         model_dir = os.path.join(out_dir, "model")
         for f in sorted(os.listdir(model_dir)):
@@ -112,7 +116,11 @@ def main():
     # 조건부 개인기록: 학습 행에는 '그 시즌 이전'으로 만든 표를 붙인다.
     if USE_COND:
         print(" 조건부 표 생성 (시즌별 과거만)...", flush=True)
-        C = cond.build_training_columns(df)
+        # 🔴 복원 라벨은 **현재 투구의 결과**다. 절대 X에 넣지 않는다.
+        #    표 생성용 사본에만 머지한다 — cond 함수는 cond_* 열만 돌려준다.
+        _dfl = df.merge(pd.read_csv("recovered_labels.csv.gz"),
+                        on=ID, how="left")
+        C = cond.build_training_columns(_dfl)
         use = ([c for c in cond.COND_COLS
                 if any(c == "cond_" + n or c == "cond_" + n + "_dev"
                        for n in COND_ONLY)] if COND_ONLY else list(cond.COND_COLS))
@@ -185,7 +193,7 @@ def main():
     # 추론용 표: train 전체(2019~2024)로 만든다.
     # 학습 행이 '그 행 이전 시즌 전부'를 썼던 것과 같은 규칙 (2025 기준 과거 = 전체).
     if USE_COND:
-        for name, t in cond.build_tables(df).items():
+        for name, t in cond.build_tables(_dfl).items():
             t.to_csv(os.path.join(out_dir, "model", f"cond_{name}.csv"),
                      index=False, encoding="utf-8")
         print(f" cond 표 {len(cond.SPECS)}개 저장")

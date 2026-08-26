@@ -42,9 +42,10 @@ from scipy.optimize import brentq
 
 sys.path.insert(0, "common")
 from features import engineer, prepare, build_anchor  # noqa: E402
+import cond  # noqa: E402
 
-RUN = "037_shift_d4"
-BASE_RUN = "036_offset_d4"
+RUN = "055_shift_phb"
+BASE_RUN = "054_offset_phb"
 FRACTION = 1.0            # 012에서 전량이 예측대로 적중(잔여 여지 +0.12)
 # 검증 예측 캐시 — 추정자 ②의 편향을 재는 데 쓴다 (BASE_RUN의 피처 구성으로 만든 것)
 VAL_CACHE = "artifacts/auxpred_ins4"
@@ -121,6 +122,11 @@ def main():
         anchor["apply_season"] = 2025
     fe = engineer(fake.drop(columns=[ID]), meta["global_mean"], anchor=anchor,
                   priors=meta.get("rate_priors"))
+    if meta.get("use_cond"):
+        # ⚠️ script.py의 같은 블록과 반드시 일치시킬 것 — 추론 경로 이중 구현이다(§9).
+        fe = cond.apply_tables(fe, {
+            n: pd.read_csv(os.path.join(mdir_base, f"cond_{n}.csv"),
+                           encoding="utf-8") for n, _, _ in cond.SPECS})
     print(f" 가짜 test {len(fake):,}행 구성 완료", flush=True)
 
     p = predict(mdir_base, meta, fe)
