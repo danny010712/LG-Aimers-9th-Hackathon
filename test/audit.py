@@ -34,6 +34,21 @@ PAIRS = [
      "cond_ph 단독", "지속성 통과 표 1개"),
     ("041_condph", "049_condphbh", "044_platoon_condph", "052_platoon_phbh",
      "cond_bh 추가", "지속성 ph급인데 실패"),
+    ("209_base044", "213_base044_fw03", "043_shift_condph", "213_shift_base044_fw03",
+     "pre-2023 F 가중치0.3", "주기준 fold +10.1이었으나 시드바꾸면 +3.7, 연도바꾸면 -24.9 = 불안정. LB도 결국 ❌"),
+    ("209_base044", "215_base044_top30", "043_shift_condph", "215_shift_base044_top30",
+     "피처 가지치기(top30)", "시드2종+전이3개 전부 양수(최대 +14.3)였는데 LB는 +0.23뿐 — 방향은 맞았지만 전이율 0.09배 수준. ✅(약)"),
+    ("009_offset", "216_offset_base044_mrcond", "043_shift_condph", "216_shift_base044_mrcond",
+     "보조모델 mr에 cond_ph 추가", "mr단독 시드2종 +4.4/+6.9(wayoff는 노이즈로 제외) → LB **+3.83**(1063.239→1067.073). 이번 세션 최대 실이득 ✅"),
+    ("216_offset_base044_mrcond", "217_offset_base044_mrfull", "216_shift_base044_mrcond", "217_shift_base044_mrfull",
+     "mr에 ins_pitcher_success_rate/n 추가(cond_ph 위에)", "mr단독 시드2종 +72.4/+66.1(압도적)였는데 LB는 **-1.87**(1067.073→1065.207, 043대비는 +1.97로 여전히 양수). "
+     "016/017과 같은 함정 재현 — ins_pitcher_success_rate가 주모델 2위 중요도라 mr예측이 주모델과 닮아 offset 여지가 줄어든 것으로 추정. ❌(216 대비)"),
+    ("216_offset_base044_mrcond", "218_offset_base044_mrbh", "216_shift_base044_mrcond", "218_shift_base044_mrbh",
+     "mr에 cond_bh 추가(cond_ph 위에)", "mr단독 시드2종 +3.6/+9.0(양수)였는데 LB는 **+0.43**(1067.073→1067.500) — 방향은 맞지만 사실상 노이즈 수준, 실질 개선 없음"),
+    ("216_offset_base044_mrcond", "219_multiclass_joint", "216_shift_base044_mrcond", "219_shift_multiclass_joint",
+     "success/mr/wayoff를 CatBoost MultiClass 단일모델로 조인트학습(별도 3모델+오프셋 대체)", "로컬(2세트x3시드) 최종블렌드 Δ+2.4~+10.3(883.6→893.0~893.9, 둘 다 양성, have행만 학습인데도 이김)였는데 LB는 **+0.632**(1067.073→1067.705) — 방향은 맞았지만 로컬 대비 전이율 0.06~0.26배. 218 대비도 +0.205"),
+    ("219_multiclass_joint", "220_multiclass_joint_bh", "219_shift_multiclass_joint", "220_shift_multiclass_joint_bh",
+     "219 위에 cond_bh(+dev) 추가", "🔥 **로컬-LB 부호 자체가 뒤집힌 사례.** 로컬(2세트x3시드) Δ**-0.8/+7.0**(세트간 부호 불일치 = 노이즈로 판정, 채택 보류했었음)였는데 LB는 **+12.6**(1067.705→**1080.349**, 이번 세션 단일축 최대 실이득, 신기록). 로컬 out-of-year(≤2023→2024)가 배포모델(2019~2024 전체)보다 학습연도가 1개 적어 타자조건부 표(cond_bh, 개체 많고 콜드스타트 비중 큼) 신뢰도를 과소평가했을 가능성. **교훈: 개체조건부 표 축은 로컬 신호 약해도 LB 확인 없이 기각 금지**"),
 ]
 
 

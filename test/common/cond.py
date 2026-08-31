@@ -20,7 +20,7 @@ M = 50                                  # 스무딩 강도 (표본 M개에서 �
 #    복원 라벨(recovered_labels.csv.gz)을 머지한 프레임을 넘겨야 한다.
 #    ⚠️ 복원 라벨은 **현재 투구의 결과**다 — 모델 입력 X에 절대 들어가면 안 된다.
 #       cond 함수는 cond_* 열만 반환하므로 표 생성용 프레임만 따로 넘기면 안전하다.
-TARGET_OF = {"phb": "breaking"}
+TARGET_OF = {"phb": "breaking", "pcb": "breaking", "pcf": "fastball", "pco": "offspeed"}
 
 # (이름, 그룹키, 사전분포키)
 SPECS = [
@@ -37,9 +37,18 @@ SPECS = [
     #    (success 0.0324의 12배). 주모델은 asof_pitcher_breaking_rate = 통산 주변값만
     #    가지고 손별 분해는 없다. 09 §3-E(구종 오라클 +160.5)의 합법 대리변수.
     ("phb", ["pitcher_id", "batter_hand"], "pitcher_id"),
+
+
+    ("pcb", ["pitcher_id", "count_state"], "pitcher_id"), #new
+    ("pcf", ["pitcher_id", "count_state"], "pitcher_id"), #new
+    ("pco", ["pitcher_id", "count_state"], "pitcher_id"), #new
+
+    ("pt", ["pitcher_id", "top_bottom"], "pitcher_id"), #new
 ]
 COND_COLS = ["cond_" + n for n, _, _ in SPECS] + ["cond_pc_dev", "cond_ph_dev",
-                                             "cond_bh_dev", "cond_phb_dev"]
+                                             "cond_bh_dev", "cond_phb_dev", "cond_pcb_dev",
+                                             "cond_pcf_dev", "cond_pco_dev",
+                                             "cond_pt_dev"]
 
 
 def add_keys(d):
@@ -79,6 +88,12 @@ def apply_tables(d, tables):
     d["cond_bh_dev"] = d["cond_bh"] - d["asof_batter_success_rate"]
     # 통산 변화구 비율을 뺀 나머지 = "이 손 타자에게 평소보다 얼마나 더/덜"
     d["cond_phb_dev"] = d["cond_phb"] - d["asof_pitcher_breaking_rate"]
+
+    d["cond_pcb_dev"] = d["cond_pcb"] - d["asof_pitcher_breaking_rate"] # new
+    d["cond_pcf_dev"] = d["cond_pcf"] - d["asof_pitcher_fastball_rate"] # new
+    d["cond_pco_dev"] = d["cond_pco"] - d["asof_pitcher_offspeed_rate"] # new
+
+    d["cond_pt_dev"] = d["cond_pt"] - d["asof_pitcher_success_rate"] # new
     return d.drop(columns=["count_state_x"], errors="ignore")
 
 

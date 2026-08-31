@@ -46,13 +46,13 @@ import pandas as pd
 sys.path.insert(0, "common")
 from features import build_anchor  # noqa: E402
 
-RUN = "056_platoon_phb"
-BASE_RUN = "055_shift_phb"
+RUN = "216_platoon_base044_mrcond"
+BASE_RUN = "216_shift_base044_mrcond"
 M = 270                       # 수축 강도 (tau 역산값. 스윕 최고점과 일치)
-# 계수 b 적합용 검증 예측 (2019~23 학습 → 2024). BASE_RUN의 성공모델 = 013.
-VAL_SUCCESS = "artifacts/auxpred_condphb"
-VAL_AUX = "artifacts/auxpred"
-VAL_SEEDS = [42, 7, 2024]   # 성공모델 캐시용. 보조는 off["seeds"]
+# 계수 b 적합용 검증 예측 (2019~23 학습 → 2024). BASE_RUN의 성공모델 = 209_base044(3시드).
+VAL_SUCCESS = "artifacts/auxpred_base044"
+VAL_AUX = "artifacts/auxpred_mrcond_aux"   # 216_offset_base044_mrcond의 mr(재학습)/wayoff(복사) 검증예측
+VAL_SEEDS = [42, 7, 2024]   # 성공모델 캐시용 — 209_base044 3시드. 보조는 off["seeds"] 42, 7, 2024
 DATA = "data/train.csv"
 COMMON = "common"
 ID, TARGET = "row_id", "control_success"

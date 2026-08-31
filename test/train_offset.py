@@ -38,35 +38,29 @@ from scipy.optimize import minimize
 sys.path.insert(0, "common")
 from features import (engineer, build_anchor, rate_priors,  # noqa: E402
                       CAT_COLS)
+import cond  # noqa: E402
 
-RUN = "054_offset_phb"
-BASE_RUN = "053_condphb"             # 성공 모델을 가져올 run (재학습하지 않는다)
+RUN = "218_offset_base044_mrbh"
+BASE_RUN = "209_base044"             # 성공 모델을 가져올 run (재학습하지 않는다) — 순수 044
 AUX_SEEDS = [42, 7, 2024]             # 보조모델 시드
-# 🔴 009(003 피처 57열)를 복사한다. 016에서 보조모델을 BASE_RUN 피처로 재학습해봤으나
-# LB 1051.73 -> 1047.04로 **졌다**(017). 보조모델이 성공모델과 같은 입력을 보면
-# 예측이 닮아서 offset이 밀어줄 여지가 준다(계수 b −0.0990 -> −0.0835).
-# => 보조모델은 003 피처로 고정한다.
-AUX_FROM = "009_offset"    # 보조는 복사만 (단일 변수: 주모델 depth만 바뀐다)
-AUX_COPY_FROM = "009_offset"   # 재학습하지 않는 보조는 여기서 복사
-# 🔥 mr 보조모델에만 **자기 타깃의** 시즌내 분해를 준다 (08 5-13).
-#    wayoff는 asof_*_wayoff_rate가 데이터에 없어 만들 수 없고, c=+0.0074로
-#    기여가 사실상 0이라(5-4 O2a) 개선 여지가 애초에 mr 쪽뿐이다.
-#    🔴 017과 방향이 반대다: 017은 보조에 **주모델 피처**를 줘서 예측이 닮았고
-#    (b -0.0990 -> -0.0835), 여기는 주모델에 **없는** 열을 줘서 더 멀어지게 한다.
-RETRAIN_AUX = []          # 021 체인과 동일 — 보조는 009 복사만
-MR_EXTRA_COLS = ["ins_pitcher_middle_rate", "ins_pitcher_reverse_rate"]
-# 재학습한 보조의 2024 검증 예측을 여기 쌓는다. build_platoon.py가 offset을
-# 재현하는 데 필요하다 — 옛 캐시(009)를 읽으면 계수가 어긋난다.
-AUX_OUT = "artifacts/auxpred_phb_aux"
+# 보조모델 개선 3단계: 216(mr+cond_ph, LB+3.83 확정) 위에 cond_bh(+dev, 타자 플래툰)를
+# 추가. 주모델에서는 실패(052, LB-9.33)했지만 주모델에 아예 없는 열이라(COND_ONLY=[ph]만
+# 사용) 보조모델엔 안전할 수 있다는 가설 - cond_ph의 성공 패턴과 대칭.
+# 사전검증(3시드x2세트, mr+cond_ph 기준 대비): Δ+3.6/+9.0 (둘 다 양수, cond_ph와
+# 같은 채택 기준 통과).
+# 참고: ins_pitcher_success_rate/n 추가(217)는 LB-1.87로 216보다 나빠서 기각됨 —
+# 이번엔 그 축은 빼고 cond_bh만 추가.
+AUX_FROM = ""    # 빈 문자열 = falsy -> 재학습 경로
+AUX_COPY_FROM = "009_offset"   # AUX_COLS(57열) 기본 목록 + wayoff 복사 출처
+RETRAIN_AUX = ["mr"]          # wayoff는 009_offset 그대로 복사(단일변수 유지)
+MR_EXTRA_COLS = ["cond_ph", "cond_ph_dev", "cond_bh", "cond_bh_dev"]
+AUX_OUT = "artifacts/auxpred_mrbh_aux"
 # 계수 적합에 쓸 검증 예측(2019~23 학습 -> 2024)의 시드.
-# 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다 (013=3시드).
-FIT_SUCCESS_SEEDS = [42, 7, 2024]
-# ⚠️ 성공모델 캐시는 BASE_RUN의 피처 구성으로 만든 것이어야 한다.
-# 013(시즌내 분해)은 make_valpred.py가 auxpred_ins에 새로 만든다.
-# mr/wayoff는 AUX_FROM(009, 003 피처)의 것이므로 기존 auxpred를 그대로 쓴다.
-CACHE = "artifacts/auxpred_condphb"   # "aux"는 Windows 예약 장치명이라 git이 못 연다
-AUX_CACHE = "artifacts/auxpred"
-# 검증(2019~23 -> 2024)에서 얻은 조기중단 지점. 전체 재학습에 그대로 쓴다.
+# 성공 쪽은 BASE_RUN의 시드 수와 맞춰야 한다.
+FIT_SUCCESS_SEEDS = [42, 7, 2024]  # 209_base044 3시드
+# ⚠️ 성공모델 캐시는 BASE_RUN(209_base044, 순정)의 검증예측이어야 한다.
+CACHE = "artifacts/auxpred_base044"   # 209_base044의 VALPRED_DIR과 일치
+AUX_CACHE = "artifacts/auxpred"  # wayoff(복사)용 009_offset 원본 검증예측
 BEST_ITER = {"mr": {42: 360, 7: 480, 2024: 404},
              "wayoff": {42: 351, 7: 354, 2024: 438}}
 PARAMS = dict(iterations=2000, learning_rate=0.05, depth=6,
@@ -157,6 +151,20 @@ def main():
               if base_meta.get("use_inseason") else None)
     FE = engineer(df.drop(columns=[ID, TARGET]), gm, anchor=anchor,
                   priors=priors)
+
+    # cond_* 열은 engineer()가 아니라 cond.build_training_columns()가 만든다
+    # (train_local.py와 동일 경로). AUX_COPY_FROM이 cond를 쓰는 run(211_base044_phpcb)
+    # 이면 AUX_COLS에 cond_* 가 섞여 들어오므로 FE에도 붙여줘야 한다.
+    # 🔴 cond_* 필요 목록은 base_meta 것만이 아니라 MR_EXTRA_COLS에서 요구하는 것도
+    # 포함해야 한다(예: cond_bh — 주모델엔 없지만 보조 mr엔 추가하는 경우, 218 참고).
+    _need_cond = {c for c in base_meta["feature_cols"] if c.startswith("cond_")}
+    if not AUX_FROM:
+        _need_cond |= {c for c in MR_EXTRA_COLS if c.startswith("cond_")}
+    if _has_cond or _need_cond:
+        _dfl = df.merge(pd.read_csv("recovered_labels.csv.gz"), on=ID, how="left")
+        _C = cond.build_training_columns(_dfl)
+        for _c in _need_cond:
+            FE[_c] = _C[_c].values
 
     # 보조모델 열 — 기본은 AUX_COPY_FROM(009 = 003 피처 57열).
     # 🔴 주모델 열(61)을 쓰면 안 된다: 017이 그렇게 해서 LB -4.69로 졌다.
@@ -319,12 +327,22 @@ def main():
         aux_meta = json.load(open(os.path.join("runs", AUX_FROM, "model",
                                                "meta.json"), encoding="utf-8"))
         if aux_meta["feature_cols"] != base_meta["feature_cols"]:
-            missing = [c_ for c_ in aux_meta["feature_cols"]
-                       if c_ not in base_meta["feature_cols"]]
-            assert not missing, f"보조모델 피처가 기반 run에 없다: {missing}"
+            # 실제 Pool은 FE(engineer() 전체 출력)에서 뽑으므로, 기준은
+            # base_meta["feature_cols"](주모델이 고른 부분집합)가 아니라 FE.columns다.
+            # 주모델이 일부 열을 의도적으로 뺀 경우(208_nodelta)에도 FE엔 남아있다.
+            missing = [c_ for c_ in aux_meta["feature_cols"] if c_ not in FE.columns]
+            assert not missing, f"보조모델 피처가 engineer() 출력에 없다: {missing}"
             meta["offset"]["aux_feature_cols"] = aux_meta["feature_cols"]
             print(f" 보조모델 피처 {len(aux_meta['feature_cols'])}개 "
                   f"(주모델 {len(base_meta['feature_cols'])}개) — 별도 Pool 사용")
+        # 🔴 보조모델의 cat_cols는 주모델 것과 다를 수 있다(215: 주모델이 피처를
+        # 가지치기하면서 top_bottom/base_state가 빠졌는데 보조는 여전히 그걸 씀).
+        # build_shift.py/script.py가 보조 Pool을 만들 때 meta["cat_cols"](주모델
+        # 것)을 그대로 재사용하면 CatBoost가 "Feature X is Categorical in model but
+        # marked different"로 죽는다 — 실제로 215에서 재현됨. 항상 별도로 저장한다.
+        if aux_meta.get("cat_cols") != base_meta.get("cat_cols"):
+            meta["offset"]["aux_cat_cols"] = aux_meta["cat_cols"]
+            print(f" 보조모델 cat_cols가 주모델과 달라 별도 저장: {aux_meta['cat_cols']}")
     json.dump(meta, open(os.path.join(mdir, "meta.json"), "w", encoding="utf-8"))
 
     json.dump({"run": RUN, "note": (

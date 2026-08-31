@@ -160,7 +160,13 @@ def engineer(df, global_mean, m=30, anchor=None, priors=None):
                                            d["away_win_expectancy"])
 
     # 6) cold-start 자체를 신호로
-    d["is_coldstart_pitcher"] = d["asof_pitcher_n"].isna().astype(int)
+    d["is_coldstart_pitcher"] = d["asof_pitcher_n"].isna().astype(int) 
+
+    # 7) 단일변수 실험
+    p_p = d[f"smoothed_pitcher_success_rate"]
+    p_b = d[f"smoothed_batter_success_rate"]
+    d["p_matchup"] = (p_p * p_b) / (p_p * p_b + (1 - p_p) * (1 - p_b) + 1e-12)
+
     return d
 
 

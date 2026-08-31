@@ -47,6 +47,12 @@ def main():
                                  encoding="utf-8")
                   for n, _, _ in cond.SPECS}
         fe = cond.apply_tables(fe, tables)
+    for ec in meta.get("extra_cond", []):
+        # cond.py SPECS를 안 건드리고 독립적으로 붙인 조건부표(train_multiclass.py의
+        # EXTRA_COND). train 전체로 만들어 zip에 실려 있다 — test 다른 행 통계 미사용.
+        t = pd.read_csv(os.path.join(BASE, "model", f"cond_{ec['name']}.csv"),
+                        encoding="utf-8")
+        fe = fe.merge(t, on=ec["keys"], how="left")
     X = prepare(fe, feature_cols, cat_cols)
     pool = Pool(X, cat_features=[X.columns.get_loc(c) for c in cat_cols])
 
@@ -62,9 +68,30 @@ def main():
             ps.append(m.predict_proba(pl if pl is not None else pool)[:, 1])
         return np.mean(ps, axis=0)
 
-    p = np.clip(avg_proba("model_", meta["seeds"]), 1e-6, 1 - 1e-6)
+    def logit(q):
+        q = np.clip(q, 1e-6, 1 - 1e-6)
+        return np.log(q / (1 - q))
 
     off = meta.get("offset")
+    off_mc = meta.get("offset_mc")
+    if meta.get("model_type") == "multiclass_joint":
+        # 조인트 3클래스(0=mr,1=wayoff,2=success) 단일모델 — 별도 보조모델 없음.
+        # 같은 모델의 세 출력을 그대로 오프셋 공식에 쓴다(train_multiclass.py).
+        ps = []
+        for sd in meta["seeds"]:
+            m = CatBoostClassifier()
+            m.load_model(os.path.join(BASE, "model", f"model_{sd}.cbm"))
+            ps.append(m.predict_proba(pool))
+        proba3 = np.mean(ps, axis=0)
+        p_success, p_mr, p_wayoff = proba3[:, 2], proba3[:, 0], proba3[:, 1]
+        z = (logit(p_success)
+             + off_mc["b"] * (logit(p_mr) - off_mc["mu_mr"])
+             + off_mc["c"] * (logit(p_wayoff) - off_mc["mu_wayoff"]))
+        p = np.clip(1 / (1 + np.exp(-z)), 1e-6, 1 - 1e-6)
+        off = None  # 아래 기존 offset 블록은 건너뛴다
+    else:
+        p = np.clip(avg_proba("model_", meta["seeds"]), 1e-6, 1 - 1e-6)
+
     if off:
         # 보조모델(mr/wayoff)은 주모델과 다른 피처 집합으로 학습됐을 수 있다.
         # 예: 013은 시즌내 분해 4열을 더 갖는데 보조모델은 009(003 피처)를
@@ -77,7 +104,17 @@ def main():
         _dflt = off.get("aux_feature_cols")
         _cols = {"mr": off.get("mr_feature_cols") or _dflt,
                  "wayoff": off.get("wayoff_feature_cols") or _dflt}
-        aux_pool = {k: (make_pool(v) if v else None) for k, v in _cols.items()}
+        # 🔴 보조모델 cat_cols가 주모델과 다를 수 있다(주모델 피처 가지치기로
+        # top_bottom/base_state 같은 범주형이 빠질 수 있음). aux_cat_cols가
+        # 저장돼 있으면 그걸 쓴다 — 안 그러면 CatBoost가 "Categorical in model
+        # but marked different"로 죽는다.
+        aux_cat_cols = off.get("aux_cat_cols") or cat_cols
+
+        def make_aux_pool(cols):
+            Z = prepare(fe, cols, aux_cat_cols)
+            return Pool(Z, cat_features=[Z.columns.get_loc(c) for c in aux_cat_cols])
+
+        aux_pool = {k: (make_aux_pool(v) if v else None) for k, v in _cols.items()}
 
         # 실패모드 offset (08 문서 §5). y=0 ⟺ (M∪R) ⊎ W 를 이용해
         # 합에서 상쇄되던 성분 정보를 되돌린다.
@@ -120,14 +157,48 @@ def main():
         p = np.clip(1 / (1 + np.exp(-(np.log(p / (1 - p)) + plat["b"] * s))),
                     1e-6, 1 - 1e-6)
 
+    bplat = meta.get("batter_platoon")
+    if bplat:
+        # 타자 좌우편차 offset — 투수판(build_platoon.py)의 타자판. 같은 메커니즘.
+        # 표는 학습 때 train으로 만들어 zip에 실려 있다. 각 행은 자기 batter_id와
+        # 자기 좌우 조합만 본다 — test의 다른 행은 안 쓴다.
+        btab = pd.read_csv(os.path.join(BASE, "model", "platoon_batter.csv"),
+                           encoding="utf-8")
+        bkey = pd.DataFrame({
+            "batter_id": test["batter_id"].values,
+            "plat": (test["pitcher_hand"] == test["batter_hand"]).astype(int).values})
+        bs = bkey.merge(btab, on=["batter_id", "plat"],
+                        how="left")["split"].fillna(0.0).values
+        assert len(bs) == len(p)
+        p = np.clip(1 / (1 + np.exp(-(np.log(p / (1 - p)) + bplat["b"] * bs))),
+                    1e-6, 1 - 1e-6)
+
+    coff = meta.get("count_offset")
+    if coff:
+        # 볼카운트 잔여편향 offset (08 §5-9). 표는 학습 때 train 전체로 만들어
+        # zip에 실려 있다 — 투수 개인 정보가 아니라 count_state(balls-strikes)
+        # 전역 표라 test의 다른 행을 쓰지 않는다.
+        ctab = pd.read_csv(os.path.join(BASE, "model", "count_offset.csv"),
+                           encoding="utf-8")
+        ckey = pd.DataFrame({
+            "count_state": (test["balls_before"].astype(str) + "-"
+                            + test["strikes_before"].astype(str)).values})
+        cs = ckey.merge(ctab, on="count_state", how="left")["cdev"].fillna(0.0).values
+        assert len(cs) == len(p)
+        p = np.clip(1 / (1 + np.exp(-(np.log(p / (1 - p)) + coff["b"] * cs))),
+                    1e-6, 1 - 1e-6)
+
     pred_map = dict(zip(test[ID], p))
     sub[TARGET] = [pred_map.get(rid, 0.5) for rid in sub[ID]]
 
     os.makedirs("./output", exist_ok=True)
     sub.to_csv("./output/submission.csv", index=False, encoding="utf-8")
     print(f"Saved ./output/submission.csv rows={len(sub)} "
-          f"seeds={len(meta['seeds'])} offset={'Y' if off else 'N'} "
+          f"seeds={len(meta['seeds'])} "
+          f"offset={'Y(mc)' if off_mc else ('Y' if off else 'N')} "
           f"platoon={'Y' if plat else 'N'} "
+          f"batter_platoon={'Y' if bplat else 'N'} "
+          f"count_offset={'Y' if coff else 'N'} "
           f"mean={p.mean():.4f}")
 
 

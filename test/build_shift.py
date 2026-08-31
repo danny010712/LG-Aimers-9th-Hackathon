@@ -44,11 +44,11 @@ sys.path.insert(0, "common")
 from features import engineer, prepare, build_anchor  # noqa: E402
 import cond  # noqa: E402
 
-RUN = "055_shift_phb"
-BASE_RUN = "054_offset_phb"
+RUN = "221_shift_multiclass_joint_bcwayoff"
+BASE_RUN = "221_multiclass_joint_bcwayoff"
 FRACTION = 1.0            # 012에서 전량이 예측대로 적중(잔여 여지 +0.12)
 # 검증 예측 캐시 — 추정자 ②의 편향을 재는 데 쓴다 (BASE_RUN의 피처 구성으로 만든 것)
-VAL_CACHE = "artifacts/auxpred_ins4"
+VAL_CACHE = "artifacts/auxpred_base044"   # 209_base044의 VALPRED_DIR
 VAL_SEEDS = [42, 7, 2024]
 DATA = "data/train.csv"
 COMMON = "common"
@@ -75,6 +75,18 @@ def predict(mdir, meta, fe):
             os.path.join(mdir, f"{prefix}{s}.cbm")).predict_proba(pl)[:, 1]
             for s in seeds], axis=0)
 
+    if meta.get("model_type") == "multiclass_joint":
+        # ⚠️ script.py의 같은 분기와 반드시 일치시킬 것 — 추론 경로 이중 구현이다(§9).
+        proba3 = np.mean([CatBoostClassifier().load_model(
+            os.path.join(mdir, f"model_{s}.cbm")).predict_proba(pool)
+            for s in meta["seeds"]], axis=0)
+        p_success, p_mr, p_wayoff = proba3[:, 2], proba3[:, 0], proba3[:, 1]
+        off_mc = meta["offset_mc"]
+        z = (logit(p_success)
+             + off_mc["b"] * (logit(p_mr) - off_mc["mu_mr"])
+             + off_mc["c"] * (logit(p_wayoff) - off_mc["mu_wayoff"]))
+        return np.clip(sigmoid(z), 1e-6, 1 - 1e-6)
+
     p = np.clip(avg("model_", meta["seeds"], pool), 1e-6, 1 - 1e-6)
     off = meta.get("offset")
     if off:
@@ -83,11 +95,14 @@ def predict(mdir, meta, fe):
         # 준 경우(028). 옛 meta는 aux_feature_cols 하나뿐이므로 그때는 둘 다 그것.
         # ⚠️ script.py의 같은 로직과 반드시 일치시킬 것 — 여기가 추론 경로 복제다.
         _dflt = off.get("aux_feature_cols") or meta["feature_cols"]
+        # 🔴 보조모델 cat_cols가 주모델과 다를 수 있다(215: 주모델 가지치기로
+        # top_bottom/base_state가 빠짐). aux_cat_cols가 저장돼 있으면 그걸 쓴다.
+        aux_cat_cols = off.get("aux_cat_cols") or meta["cat_cols"]
 
         def _pool(cols):
-            Xa = prepare(fe, cols, meta["cat_cols"])
+            Xa = prepare(fe, cols, aux_cat_cols)
             return Pool(Xa, cat_features=[Xa.columns.get_loc(c)
-                                          for c in meta["cat_cols"]])
+                                          for c in aux_cat_cols])
 
         pa_mr = _pool(off.get("mr_feature_cols") or _dflt)
         pa_wo = _pool(off.get("wayoff_feature_cols") or _dflt)
@@ -127,6 +142,11 @@ def main():
         fe = cond.apply_tables(fe, {
             n: pd.read_csv(os.path.join(mdir_base, f"cond_{n}.csv"),
                            encoding="utf-8") for n, _, _ in cond.SPECS})
+    for ec in meta.get("extra_cond", []):
+        # ⚠️ script.py의 같은 블록과 반드시 일치시킬 것.
+        t = pd.read_csv(os.path.join(mdir_base, f"cond_{ec['name']}.csv"),
+                        encoding="utf-8")
+        fe = fe.merge(t, on=ec["keys"], how="left")
     print(f" 가짜 test {len(fake):,}행 구성 완료", flush=True)
 
     p = predict(mdir_base, meta, fe)
@@ -143,8 +163,13 @@ def main():
     L = pd.read_csv("recovered_labels.csv.gz")
     have = df[[ID]].merge(L, on=ID, how="left")["middle"].notna().values
     m = (df["season"] == 2024).values & have
-    pv = np.mean([np.load(os.path.join(VAL_CACHE, f"success_2024_{s}.npy"))
-                  for s in VAL_SEEDS], axis=0)
+    if meta.get("model_type") == "multiclass_joint":
+        # train_multiclass.py가 저장한, 오프셋까지 적용된 최종 OOS 예측(have행).
+        # 209류 success단독 캐시와는 성격이 달라 별도 캐시를 쓴다.
+        pv = np.load(f"artifacts/auxpred_mc_{BASE_RUN.split('_')[0]}/final_2024_have.npy")
+    else:
+        pv = np.mean([np.load(os.path.join(VAL_CACHE, f"success_2024_{s}.npy"))
+                      for s in VAL_SEEDS], axis=0)
     bias = float(pv.mean() - df[TARGET].values[m].mean())
     est2 = cur - bias
     est = (est1 + est2) / 2

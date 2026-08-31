@@ -26,13 +26,24 @@ import cond  # noqa: E402
 import role  # noqa: E402
 
 # ===== 이번 실행 설정 =====================================================
-RUN = "053_condphb"
-NOTE = ("044(LB 1062.55) 대비 단일 변수: cond_phb — ph와 **같은 키**(투수x타자손)에 "
-        "타깃만 **구종(breaking)**으로 바꾼 표. 지속 corr **+0.832**, 지속진폭 **0.4024**로 "
-        "success(0.0324)의 12배. 주모델은 asof_pitcher_breaking_rate = 통산 주변값만 갖고 "
-        "손별 분해가 없다. _dev 열이 통산분을 빼므로 중복 아님. 09 §3-E 구종 오라클 "
-        "+160.5의 합법 대리변수 — 기존 시도(주변값·시즌내 앵커)와 형태가 다르다.")
-SEEDS = [42, 7, 2024]
+RUN = "215_base044_top30"
+NOTE = ("209_base044(63열) 중 importance 상위 30열만 남긴 공격적 피처 가지치기. "
+        "3시드 단일fold Δ+2.6/+8.4(시드2종 모두 양수), 3전이(2023→24/2022→23/2021→22) "
+        "전부 양수(+2.6/+14.3/+11.0) 확인 후 진행 — 이번 세션 최초로 시드+연도전이 "
+        "전부 일관된 양성 신호.")
+WEIGHT_PRE_F = None   # F가중치 축은 기각됨(closed.tsv) — 끔
+FEATURE_WHITELIST = [  # 209_base044 importance 상위 30 (고정, 재산정 안 함)
+    'game_type', 'ins_pitcher_success_rate', 'season', 'ins_batter_success_rate',
+    'batter_team_id', 'platoon_advantage', 'asof_pitcher_reverse_rate', 'pitcher_team_id',
+    'ins_pitcher_n', 'smoothed_pitcher_success_rate', 'game_month', 'asof_pitcher_ball_rate',
+    'asof_pitcher_prev5_game_success_rate', 'cond_ph_dev', 'balls_before',
+    'asof_pitcher_offspeed_rate', 'asof_pitcher_success_rate', 'count_advantage',
+    'asof_pitcher_n', 'asof_pitcher_prev1_game_success_rate', 'asof_pitcher_pitchmix_n',
+    'batter_hand', 'asof_pitcher_prev3_game_success_rate', 'cond_ph', 'strikes_before',
+    'pitcher_id', 'recent_control_momentum', 'pitcher_hand', 'count_state',
+    'asof_pitcher_fastball_rate',
+]
+SEEDS = [42, 7, 2024] #42, 7, 2024, 99, 1, 123, 777
 POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추니 +0.8 (§3-L)
 # cond는 교정된 채택기준에서 탈락 — 합계 +8.2는 죽은 fold 2023(+11.0)이 만든 것이고
 # 유효 fold만 세면 −2.8이다 (08 §3). depth도 6 유지 (d8 이득은 2024 단독).
@@ -42,7 +53,7 @@ POLICIES = ["SymmetricTree"]              # grow_policy 혼합은 개수 맞추�
 # offset으로 주니 021에서 +5.27이었다. **번들링이 원인인지 파라미터화가
 # 원인인지 분리된 적이 없다.** ph만 주면 갈린다.
 USE_COND = True
-COND_ONLY = ["ph", "phb"]        # None이면 SPECS 전부
+COND_ONLY = ["ph"]        # None이면 SPECS 전부. "ph", "phb", "pcb" 등
 # 🔥 투수 역할(등판당 투구수) 표 — 09 §2-P.
 # 레벨 보정 형태로는 전이가 갈렸다(2023->2024 -8.08 / 2022->2024 +10.86, 진폭 부호 1/3).
 # 여기서는 **트리 피처**로 준다. 039가 보인 대로 형태가 결과를 바꿀 수 있고,
@@ -51,7 +62,7 @@ USE_ROLE = False
 USE_INSEASON = True                       # 시즌내 성적 분해 (§5-10)
 # offset 계수 적합용 검증 예측을 여기 쌓는다. 피처 구성이 바뀌면 캐시도 바뀌므로
 # train_offset.py의 CACHE와 반드시 같은 경로여야 한다.
-VALPRED_DIR = "artifacts/auxpred_condphb"
+VALPRED_DIR = "artifacts/auxpred_base044_top30"
 PARAMS = dict(
     iterations=2000, learning_rate=0.05, depth=6,   # 021과 동일. 단일 변수는 cond_ph
     thread_count=-1, verbose=0, eval_metric="Logloss",   # CatBoost는 -1 (0은 크래시)
@@ -112,6 +123,7 @@ def main():
     priors = rate_priors(df[tr]) if USE_INSEASON else None
     X = engineer(df.drop(columns=[ID, TARGET]), global_mean, anchor=anchor,
                  priors=priors)
+    X = X.drop(columns=["p_matchup"])  # 사용자 지정 044 기준선: p_matchup 제외
 
     # 조건부 개인기록: 학습 행에는 '그 시즌 이전'으로 만든 표를 붙인다.
     if USE_COND:
@@ -137,16 +149,29 @@ def main():
         print(f" role 열 {role.ROLE_COLS}  결측률 "
               f"{X[role.ROLE_COLS].isna().mean().mean()*100:.1f}%", flush=True)
 
+    if FEATURE_WHITELIST is not None:
+        missing = [c for c in FEATURE_WHITELIST if c not in X.columns]
+        assert not missing, f"화이트리스트 열이 없음: {missing}"
+        X = X[FEATURE_WHITELIST].copy()
+        print(f" 피처 가지치기: {len(FEATURE_WHITELIST)}열만 사용", flush=True)
+
     feature_cols = list(X.columns)
-    for c in CAT_COLS:
+    cat_cols_here = [c for c in CAT_COLS if c in X.columns]
+    for c in cat_cols_here:
         X[c] = X[c].astype(str)
-    ci = [X.columns.get_loc(c) for c in CAT_COLS]
+    ci = [X.columns.get_loc(c) for c in cat_cols_here]
     print(f" rows={len(df)}  feats={len(feature_cols)}  "
           f"global_mean={global_mean:.4f}")
 
+    w = None
+    if WEIGHT_PRE_F is not None:
+        is_pre_f = ((df["season"] <= 2022) & (df["game_type"] == "F")).values
+        w = np.where(is_pre_f, WEIGHT_PRE_F, 1.0)
+        print(f" pre-2023 F 가중치 {WEIGHT_PRE_F} 적용 ({is_pre_f.sum():,}행)", flush=True)
+
     print(f"\n--- 검증 (2019-2023 -> 2024), {POLICIES} x {SEEDS} ---")
     val_preds, best_iters, tags = [], [], []
-    pool_tr = Pool(X[tr], y[tr], cat_features=ci)
+    pool_tr = Pool(X[tr], y[tr], cat_features=ci, weight=(w[tr] if w is not None else None))
     pool_va = Pool(X[va], y[va], cat_features=ci)
     for gp in POLICIES:
         for sd in SEEDS:
@@ -179,7 +204,7 @@ def main():
           f"skill={skill:.5f} score~{score:.1f}")
 
     print("\n--- 전체 데이터(2019-2024) 재학습 ---")
-    pool_all = Pool(X, y, cat_features=ci)
+    pool_all = Pool(X, y, cat_features=ci, weight=w)
     final = dict(PARAMS)
     final.pop("early_stopping_rounds")
     for tag, it in zip(tags, best_iters):
@@ -213,7 +238,7 @@ def main():
               f"{(anchor['apply_season'] == last).sum():,}행)")
 
     json.dump({"seeds": tags, "feature_cols": feature_cols,
-               "cat_cols": CAT_COLS, "global_mean": global_mean,
+               "cat_cols": cat_cols_here, "global_mean": global_mean,
                "use_cond": USE_COND, "use_inseason": USE_INSEASON,
                "use_role": USE_ROLE,
                "rate_priors": priors},
