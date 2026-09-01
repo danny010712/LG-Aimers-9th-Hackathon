@@ -10,14 +10,38 @@
 - 궁금한 거 있으시면 언제든 물어봐주세요.
 ```
 
-## 현황 (2026-08-25)
+## 현황 (2026-09-02, 대회 마감)
 
 | 항목 | 값 |
 |---|---|
-| 우리 점수 | **1057.00** ([submit021](test/runs/021_platoon)) |
+| LB 확정 최고 | **1080.349** ([submit220](test/runs/220_shift_multiclass_joint_bh)) |
+| 마지막 배포(LB 미확인) | 222 = 220 +`team13_transition`. 마감 임박으로 **검증 스킵 긴급배포**([상세](CLAUDE.md#6)) |
 | 100위 컷 | ~1130 |
 
-## 현재 구성
+⚠️ 대회가 2026-09-02 09:59에 마감됐고 222는 제출하지 못했습니다. 아래 "현재 구성"은
+220/222가 쓰는 **조인트 MultiClass 구조**입니다 — 021까지 썼던 "성공모델+보조모델+offset
+3단 파이프라인"(바로 아래 옛 설명)은 219에서 대체됐습니다. 자세한 배경은 [CLAUDE.md §6](CLAUDE.md).
+
+## 현재 구성 (219~222, 조인트 MultiClass)
+
+```
+모델    CatBoost MultiClass(loss=eval=MultiClass), depth 6, lr .05, 3시드(42/7/2024)
+        클래스: 0=mr(middle|reverse) 1=wayoff 2=success — 라벨 복원된 행만 학습
+        하나의 모델이 success/mr/wayoff를 동시에 예측 → 옛 구조의 보조모델(mr/wayoff)이 불필요해짐
+피처    FE + 시즌내 성적 분해 4열 + cond_ph(+dev) + cond_bh(+dev) [+team13_transition, 222부터]
+offset  logit(p) = logit(P_success) + b·(logit(P_mr)−mu_mr) + c·(logit(P_wayoff)−mu_wayoff)
+        같은 모델의 출력을 재사용(별도 보조모델 없음). b,c는 훨씬 작음(조인트학습이 흡수)
+shift   전역 로짓 이동 (2025 base rate를 train만으로 추정해 상수만큼 미는 것, build_shift.py)
+```
+
+- `a`·`d`를 적합하면 그게 calibration이고 시즌 전이가 깨집니다(219 이후도 동일하게 고정).
+- `mu`·`logit_shift`·기준점 표·cond 표는 **학습 때 계산해 zip에 싣습니다.**
+  test에서 계산하면 test 행간 통계라 규정 위반입니다.
+- 학습: `train_multiclass.py` 하나로 검증(3시드)→전체재학습→zip까지 끝납니다(옛 구조의
+  `train_local.py`+`train_offset.py` 두 스크립트가 이걸로 대체됨).
+
+<details>
+<summary>옛 구성 (003~021, 2026-08-25 시점 — 참고용)</summary>
 
 ```
 성공모델  CatBoost depth 6, lr .05, cat_features 지정, 3시드
@@ -25,28 +49,27 @@
 offset    logit(p) += b·(logit(p_mr) − mu_mr) + c·(logit(p_wayoff) − mu_wayoff)
           b = −0.0990, c = +0.0074,  a=1·d=0 고정
 shift     전역 로짓 −0.043768  (2025 base rate 추정 0.4762)
-platoon   logit(p) += 2.12 · split[pitcher_id, 좌우일치]     ← 신규
+platoon   logit(p) += 2.12 · split[pitcher_id, 좌우일치]
 ```
 
-- `a`·`d`를 적합하면 그게 calibration이고 시즌 전이가 깨집니다.
-- `mu`·`logit_shift`·기준점 표·platoon 표는 **학습 때 계산해 zip에 싣습니다.**
-  test에서 계산하면 test 행간 통계라 규정 위반입니다.
 - 보조모델(`mr`/`wayoff`)은 003 피처(57열)입니다. 주모델(61열)과 Pool을 공유하면 CatBoost가
   죽어서 `offset.aux_feature_cols`로 열 부분집합만 따로 뽑습니다.
+</details>
 
 ## 주요 코드
 
 | 파일 | 역할 |
 |---|---|
 | [features.py](test/common/features.py) | 피처 정의. 학습·추론이 **이 파일 하나를 공유**합니다 |
-| [script.py](test/common/script.py) | 평가 서버 추론 스크립트 |
-| [league_rate.py](test/common/league_rate.py) | 리그 평균 외삽 (팀원 코드) |
-| [train_local.py](test/train_local.py) | 성공모델 학습 |
-| [train_offset.py](test/train_offset.py) | 실패 유형별 offset |
-| [build_shift.py](test/build_shift.py) | 시즌 base rate 보정 |
-| [build_platoon.py](test/build_platoon.py) | 투수 좌우편차 보정 |
+| [cond.py](test/common/cond.py) | 개체×상황 EB스무딩 조건부표(cond_ph/cond_bh 등) |
+| [script.py](test/common/script.py) | 평가 서버 추론 스크립트 (옛/조인트 구조 둘 다 지원) |
+| [train_multiclass.py](test/train_multiclass.py) | **현재 쓰는 학습 스크립트.** 조인트 MultiClass, 검증→재학습→zip을 한 번에 |
+| [build_shift.py](test/build_shift.py) | 시즌 base rate 보정 (옛/조인트 구조 둘 다 지원) |
 | [verify_submit.py](test/verify_submit.py) | **제출 전 필수.** 전체규모 실행 검증 |
 | [recover_labels.py](test/recover_labels.py) | 숨은 투구 라벨 복원 |
+| [audit.py](test/audit.py) | `why-not <키워드>`로 이미 닫힌 축 검색, `record`로 로컬Δ↔LBΔ 전수표 |
+| [closed.tsv](test/closed.tsv) | 재시도 금지 목록(기각 실험 90여 건, 데이터) |
+| [train_local.py](test/train_local.py)/[train_offset.py](test/train_offset.py)/[build_platoon.py](test/build_platoon.py) | 옛 구조(003~021)용 — 조인트 구조에선 안 씀, 하위호환용으로 남겨둠 |
 
 ## 주요 변화
 
@@ -58,6 +81,10 @@ platoon   logit(p) += 2.12 · split[pitcher_id, 좌우일치]     ← 신규
 | 시즌 base rate 로짓 이동 | **+47.04** | [012](test/runs/012_shift_full) |
 | **시즌내 성적 분해** | **+53.7** | [015](test/runs/015_shift_inseason) |
 | 투수 좌우편차 offset | +5.27 | [021](test/runs/021_platoon) |
+| `cond_ph`(투수×타자손) 트리 피처 단독 | +5.55 | [044](test/runs/044_platoon_condph) |
+| success/mr/wayoff를 CatBoost MultiClass 하나로 조인트학습(구조 전환) | +0.632 | [219](test/runs/219_shift_multiclass_joint) |
+| 219 +`cond_bh`(타자×투수손) | **+12.6** (이 프로젝트 단일축 최대 실이득) | [220](test/runs/220_shift_multiclass_joint_bh) ← LB 확정 최고 |
+| 220 +`team13_transition`(체제전환 지시자) | ? (검증 스킵 긴급배포, LB 미확인) | [222](test/runs/222_shift_multiclass_joint_team13) |
 
 **003** — `cat_features`를 지정 안 하고 `OrdinalEncoder`로 넣으면 CatBoost의 ordered target
 statistics가 아예 안 돕니다(+114). FE 10개(+98)는 주자·압박 플래그를 전부 뺀 것입니다.
@@ -117,12 +144,14 @@ out-of-year로 잰 델타는 **부호가 유지되고** fold 내부 델타는 �
 
 ```bash
 cd test
-python train_local.py     # 성공모델. 상단 RUN 이름 변경 필수 (기존 RUN 있으면 실행 거부)
-python train_offset.py    # 보조모델 + offset 계수
-python build_shift.py     # 전역 로짓 이동
-python build_platoon.py   # 투수 좌우편차 → submit zip
+python train_multiclass.py   # 조인트 모델. 상단 RUN 이름 변경 필수(기존 RUN 있으면 실행 거부)
+                              # 검증(3시드)→전체재학습→zip까지 이 한 스크립트 안에서 끝남
+python build_shift.py        # 전역 로짓 이동 → 최종 submit zip
 python verify_submit.py runs/<RUN>/submit<NNN>.zip    # 제출 전 필수
 ```
+
+옛 구조(003~021, `train_local.py`→`train_offset.py`→`build_shift.py`→`build_platoon.py`)도
+하위호환으로 여전히 돌아가지만 지금 안 씁니다.
 
 전부 `test/`를 작업 디렉토리로 가정합니다(경로가 상대경로입니다).
 
