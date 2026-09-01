@@ -28,14 +28,15 @@ from features import engineer, build_anchor, rate_priors, CAT_COLS  # noqa: E402
 import cond  # noqa: E402
 
 # ===== 이번 실행 설정 =====================================================
-RUN = "221_multiclass_joint_bcwayoff"
-NOTE = ("220(조인트 3클래스, cond_ph+cond_bh) + cond_bc_wayoff(타자x볼카운트->wayoff) 추가. "
-        "이 축은 로컬(구 아키텍처, 3승3패 노이즈)만으로 기각했었는데, cond_bh가 로컬 노이즈였음에도 "
-        "LB+12.6(219->220)이었던 걸 보고 재검토 대상으로 선정 — LB로 직접 확인.")
+RUN = "222_multiclass_joint_team13"
+NOTE = ("220(조인트 3클래스, cond_ph+cond_bh) + team13_transition(체제전환 지시자, "
+        "features.py engineer()에 추가된 raw-column 파생 플래그) 추가. 044 구조에서는 "
+        "5시드 Δ+2.9(노이즈 안)로 닫혔었으나 조인트 구조 재검증: 원시드 Δ-1.1 / 새시드 Δ+4.5 "
+        "(둘 다 노이즈 폭 안, '너무 심한 손해' 아님 — 사용자 지시로 LB 직접 확인 위해 배포)")
 COND_ONLY = ["ph", "bh"]
 # EXTRA_COND: cond.py SPECS를 안 건드리고(다른 run 영향 없음) 독립적으로 추가하는
 # leak-safe 시즌롤링 조건부표. (name, keys, prior_entity_col, target_col, M)
-EXTRA_COND = [("bc_wayoff", ["batter_id", "count_state"], "batter_id", "wayoff", 50)]
+EXTRA_COND = []
 SEEDS = [42, 7, 2024]
 PARAMS = dict(iterations=2000, learning_rate=0.05, depth=6,
               thread_count=-1, verbose=0, eval_metric="MultiClass",

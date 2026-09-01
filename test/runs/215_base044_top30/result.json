@@ -1,0 +1,31 @@
+{
+  "run": "215_base044_top30",
+  "note": "209_base044(63열) 중 importance 상위 30열만 남긴 공격적 피처 가지치기. 3시드 단일fold Δ+2.6/+8.4(시드2종 모두 양수), 3전이(2023→24/2022→23/2021→22) 전부 양수(+2.6/+14.3/+11.0) 확인 후 진행 — 이번 세션 최초로 시드+연도전이 전부 일관된 양성 신호.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 30,
+  "best_iters": [
+    221,
+    270,
+    279
+  ],
+  "val_2024": {
+    "brier": 0.24763400160751944,
+    "skill": 0.008698418324420976,
+    "score": 869.8418324420976
+  },
+  "lb_2025": null
+}

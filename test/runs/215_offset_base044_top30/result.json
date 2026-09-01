@@ -1,0 +1,117 @@
+{
+  "run": "215_offset_base044_top30",
+  "note": "215_base044_top30 성공모델 그대로 + 실패모드 offset(mr/wayoff). 재학습 없음 = 단일 변수. a=1,d=0 고정(calibration 성분 제거), mu는 학습때 저장. 배포 유사 실측 2022계수->2024 = +26.6. 08 문서 §5",
+  "base_run": "215_base044_top30",
+  "aux_from": "009_offset",
+  "success_seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "aux_seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss"
+  },
+  "offset": {
+    "seeds": [
+      42,
+      7,
+      2024
+    ],
+    "b": -0.09695169788493688,
+    "c": 0.013706681673483621,
+    "mu_mr": -0.5127720817592394,
+    "mu_wayoff": -1.9876306513122235,
+    "aux_feature_cols": [
+      "season",
+      "game_month",
+      "game_dayofweek",
+      "inning",
+      "top_bottom",
+      "game_type",
+      "balls_before",
+      "strikes_before",
+      "outs_before",
+      "run_top_before",
+      "run_bot_before",
+      "run_total_before",
+      "score_diff_home",
+      "score_diff_pitcher_team",
+      "runner_on_1b",
+      "runner_on_2b",
+      "runner_on_3b",
+      "num_runners_on",
+      "base_state",
+      "home_win_expectancy",
+      "away_win_expectancy",
+      "li",
+      "pitcher_id",
+      "batter_id",
+      "pitcher_hand",
+      "batter_hand",
+      "pitcher_team_id",
+      "batter_team_id",
+      "asof_pitcher_n",
+      "asof_pitcher_success_rate",
+      "asof_pitcher_reverse_rate",
+      "asof_pitcher_middle_rate",
+      "asof_pitcher_ball_rate",
+      "asof_pitcher_strike_rate",
+      "asof_pitcher_prev1_game_success_rate",
+      "asof_pitcher_prev3_game_success_rate",
+      "asof_pitcher_prev5_game_success_rate",
+      "asof_pitcher_prev1_game_middle_rate",
+      "asof_pitcher_prev3_game_middle_rate",
+      "asof_pitcher_prev5_game_middle_rate",
+      "asof_batter_n",
+      "asof_batter_success_rate",
+      "asof_batter_middle_rate",
+      "asof_pitcher_pitchmix_n",
+      "asof_pitcher_fastball_rate",
+      "asof_pitcher_breaking_rate",
+      "asof_pitcher_offspeed_rate",
+      "smoothed_pitcher_success_rate",
+      "smoothed_batter_success_rate",
+      "platoon_advantage",
+      "count_advantage",
+      "count_state",
+      "recent_control_momentum",
+      "form_trend_5_1",
+      "is_home",
+      "pitcher_win_expectancy",
+      "is_coldstart_pitcher"
+    ],
+    "aux_cat_cols": [
+      "top_bottom",
+      "game_type",
+      "base_state",
+      "pitcher_hand",
+      "batter_hand",
+      "pitcher_team_id",
+      "batter_team_id",
+      "count_state"
+    ]
+  },
+  "best_iters": {
+    "mr": {
+      "42": 360,
+      "7": 480,
+      "2024": 404
+    },
+    "wayoff": {
+      "42": 351,
+      "7": 354,
+      "2024": 438
+    }
+  },
+  "lb_2025": null
+}

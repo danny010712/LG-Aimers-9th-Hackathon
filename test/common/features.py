@@ -160,7 +160,14 @@ def engineer(df, global_mean, m=30, anchor=None, priors=None):
                                            d["away_win_expectancy"])
 
     # 6) cold-start 자체를 신호로
-    d["is_coldstart_pitcher"] = d["asof_pitcher_n"].isna().astype(int) 
+    d["is_coldstart_pitcher"] = d["asof_pitcher_n"].isna().astype(int)
+
+    # 6-1) team13 체제전환 지시자 (DACON QNA, 2023-05 경계 실측 확인됨)
+    team13_involved = (d["pitcher_team_id"] == 13) | (d["batter_team_id"] == 13)
+    team13_regime = ((d["season"] > 2023) |
+                      ((d["season"] == 2023) &
+                       ((d["game_month"] >= 5) | (d["game_type"] == "F"))))
+    d["team13_transition"] = (team13_involved & team13_regime).astype(int)
 
     # 7) 단일변수 실험
     p_p = d[f"smoothed_pitcher_success_rate"]

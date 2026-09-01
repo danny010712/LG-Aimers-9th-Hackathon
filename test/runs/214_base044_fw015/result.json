@@ -1,0 +1,31 @@
+{
+  "run": "214_base044_fw015",
+  "note": "209_base044 + pre-2023 F 행 가중치 0.15(09 §1-I dilution 비율 하한). 0.3(213, val Δ+10.07)이 임의의 중간값이었기에 하한값으로 정교화 시도.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    191,
+    204,
+    163
+  ],
+  "val_2024": {
+    "brier": 0.24763881348509362,
+    "skill": 0.00867915593791857,
+    "score": 867.915593791857
+  },
+  "lb_2025": null
+}

@@ -1,0 +1,39 @@
+{
+  "run": "205_pcb_7seed",
+  "note": "201_pcb 대비 단일 변수: 7seed",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024",
+    "Sym_99",
+    "Sym_1",
+    "Sym_123",
+    "Sym_777"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    261,
+    273,
+    285,
+    390,
+    308,
+    301,
+    250
+  ],
+  "val_2024": {
+    "brier": 0.24762665746303428,
+    "skill": 0.008727817607221189,
+    "score": 872.7817607221189
+  },
+  "lb_2025": null
+}

@@ -1,0 +1,30 @@
+{
+  "run": "219_multiclass_joint",
+  "note": "success/mr/wayoff 조인트 3클래스(MultiClass) 단일모델. 044(63열, cond_ph 포함) 동일 피처. 검증: 원시드 Δ+10.3 / 새시드 Δ+2.4 (vs 216 최종블렌드 883.6, test_multiclass_offset.py). have행만 학습(~86%)인데도 이겼다.",
+  "model": "catboost_multiclass",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "MultiClass",
+    "loss_function": "MultiClass",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    458,
+    393,
+    482
+  ],
+  "val_2024_success_only": 888.6848576841966,
+  "val_2024_with_offset": 893.0005943717067,
+  "val_2024_full_2024rows": 893.7391601586797,
+  "lb_2025": null
+}

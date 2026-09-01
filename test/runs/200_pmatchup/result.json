@@ -1,0 +1,31 @@
+{
+  "run": "200_pmatchup",
+  "note": "199_original 대비 단일 변수: p_matchup",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 64,
+  "best_iters": [
+    268,
+    257,
+    271
+  ],
+  "val_2024": {
+    "brier": 0.24766177817066307,
+    "skill": 0.00858722619894936,
+    "score": 858.7226198949361
+  },
+  "lb_2025": null
+}

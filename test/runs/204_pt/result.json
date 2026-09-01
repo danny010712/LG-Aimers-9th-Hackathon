@@ -1,0 +1,31 @@
+{
+  "run": "204_pt",
+  "note": "044(LB 1062.55) 대비 단일 변수: cond_ph + cond_pt",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    287,
+    273,
+    248
+  ],
+  "val_2024": {
+    "brier": 0.24765956150457763,
+    "skill": 0.008596099716246197,
+    "score": 859.6099716246197
+  },
+  "lb_2025": null
+}

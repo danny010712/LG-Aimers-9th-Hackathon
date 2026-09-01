@@ -1,0 +1,30 @@
+{
+  "run": "221_multiclass_joint_bcwayoff",
+  "note": "220(조인트 3클래스, cond_ph+cond_bh) + cond_bc_wayoff(타자x볼카운트->wayoff) 추가. 이 축은 로컬(구 아키텍처, 3승3패 노이즈)만으로 기각했었는데, cond_bh가 로컬 노이즈였음에도 LB+12.6(219->220)이었던 걸 보고 재검토 대상으로 선정 — LB로 직접 확인.",
+  "model": "catboost_multiclass",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "MultiClass",
+    "loss_function": "MultiClass",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 66,
+  "best_iters": [
+    518,
+    520,
+    461
+  ],
+  "val_2024_success_only": 885.3374749791976,
+  "val_2024_with_offset": 889.4528190779072,
+  "val_2024_full_2024rows": 889.4983346532048,
+  "lb_2025": null
+}

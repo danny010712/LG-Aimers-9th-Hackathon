@@ -1,0 +1,48 @@
+{
+  "run": "212_offset_phpcb_fw03",
+  "note": "212_base044_phpcb_fw03 성공모델 그대로 + 실패모드 offset(mr/wayoff). 재학습 없음 = 단일 변수. a=1,d=0 고정(calibration 성분 제거), mu는 학습때 저장. 배포 유사 실측 2022계수->2024 = +26.6. 08 문서 §5",
+  "base_run": "212_base044_phpcb_fw03",
+  "aux_from": "211_offset_phpcb",
+  "success_seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "aux_seeds": [
+    42,
+    7,
+    2024
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss"
+  },
+  "offset": {
+    "seeds": [
+      42,
+      7,
+      2024
+    ],
+    "b": -0.076968919826614,
+    "c": 0.018962410435415654,
+    "mu_mr": -0.5127297393961496,
+    "mu_wayoff": -1.9897627599675312
+  },
+  "best_iters": {
+    "mr": {
+      "42": 371,
+      "7": 446,
+      "2024": 281
+    },
+    "wayoff": {
+      "42": 343,
+      "7": 433,
+      "2024": 439
+    }
+  },
+  "lb_2025": null
+}

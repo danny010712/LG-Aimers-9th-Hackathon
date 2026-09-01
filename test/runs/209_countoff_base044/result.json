@@ -1,0 +1,14 @@
+{
+  "run": "209_countoff_base044",
+  "note": "209_platoon_base044 + 볼카운트 잔여편향 offset (b=1.0 고정, M=200). 재학습 없음 = 단일 변수. 표는 raw rate가 아니라 이 파이프라인 자신의 2024 잔차로 적합(004식 이중정보 함정 회피). 2024 5-fold OOF(platoon 적용후) 979.7 -> 960.6 (-19.1). 사전 out-of-year 지속성 corr +0.39~+0.60, 배포방향 전이 3개 전부 양수(+1.0~+3.7, probe_count_offset.py) 확인 후 진행. 08 §5-9",
+  "base_run": "209_platoon_base044",
+  "b": 1.0,
+  "m": 200,
+  "val_2024_oof": {
+    "before": 979.7449456592444,
+    "after_oof": 960.6451462701226,
+    "delta": -19.099799389121813
+  },
+  "coverage_train": 1.0,
+  "lb_2025": null
+}

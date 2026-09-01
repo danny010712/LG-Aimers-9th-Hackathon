@@ -1,0 +1,31 @@
+{
+  "run": "208_nodelta",
+  "note": "200_pmatchup 대비 단일 변수: recent_control_momentum/form_trend_5_1 제거 (3시드x3연도전이 전부 양수로 사전검증: +2.1/+15.5/+0.5)",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 62,
+  "best_iters": [
+    282,
+    307,
+    218
+  ],
+  "val_2024": {
+    "brier": 0.24766289851226705,
+    "skill": 0.008582741368930669,
+    "score": 858.2741368930668
+  },
+  "lb_2025": null
+}

@@ -1,0 +1,27 @@
+{
+  "run": "111_test",
+  "note": "044(LB 1062.55) 대비 단일 변수: cond_phb — ph와 **같은 키**(투수x타자손)에 타깃만 **구종(breaking)**으로 바꾼 표. 지속 corr **+0.832**, 지속진폭 **0.4024**로 success(0.0324)의 12배. 주모델은 asof_pitcher_breaking_rate = 통산 주변값만 갖고 손별 분해가 없다. _dev 열이 통산분을 빼므로 중복 아님. 09 §3-E 구종 오라클 +160.5의 합법 대리변수 — 기존 시도(주변값·시즌내 앵커)와 형태가 다르다.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    266
+  ],
+  "val_2024": {
+    "brier": 0.24767255540081384,
+    "skill": 0.008544083959898141,
+    "score": 854.4083959898142
+  },
+  "lb_2025": null
+}

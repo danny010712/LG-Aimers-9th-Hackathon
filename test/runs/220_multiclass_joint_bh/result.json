@@ -1,0 +1,30 @@
+{
+  "run": "220_multiclass_joint_bh",
+  "note": "219(조인트 3클래스, cond_ph만) + cond_bh(+dev) 추가. 구 아키텍처에서 bh->wayoff는 서브타깃 5/6승했지만 wayoff 블렌드계수 c가 작아 최종점수 Δ-0.2(무의미)였다. 조인트 모델엔 그 병목(별도 스칼라 c)이 없어 재검증 -> 219 기준 위 원시드 Δ+2.7(893.0->895.7) / 새시드 Δ+4.1(885.5->889.6), 둘 다 양성. test_mc_cond_bh.py(scratchpad)",
+  "model": "catboost_multiclass",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "MultiClass",
+    "loss_function": "MultiClass",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    511,
+    580,
+    402
+  ],
+  "val_2024_success_only": 888.1291318125317,
+  "val_2024_with_offset": 892.2403379597043,
+  "val_2024_full_2024rows": 892.8425302379806,
+  "lb_2025": null
+}

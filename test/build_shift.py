@@ -44,8 +44,8 @@ sys.path.insert(0, "common")
 from features import engineer, prepare, build_anchor  # noqa: E402
 import cond  # noqa: E402
 
-RUN = "221_shift_multiclass_joint_bcwayoff"
-BASE_RUN = "221_multiclass_joint_bcwayoff"
+RUN = "222_shift_multiclass_joint_team13"
+BASE_RUN = "222_multiclass_joint_team13"
 FRACTION = 1.0            # 012에서 전량이 예측대로 적중(잔여 여지 +0.12)
 # 검증 예측 캐시 — 추정자 ②의 편향을 재는 데 쓴다 (BASE_RUN의 피처 구성으로 만든 것)
 VAL_CACHE = "artifacts/auxpred_base044"   # 209_base044의 VALPRED_DIR

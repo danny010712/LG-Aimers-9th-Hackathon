@@ -1,0 +1,31 @@
+{
+  "run": "209_base044",
+  "note": "사용자 지정 기준선 재현: 044와 동등(COND_ONLY=ph, p_matchup 제외, offset은 009_offset 복사) — 카운트별 shift 실험의 베이스",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    301,
+    309,
+    311
+  ],
+  "val_2024": {
+    "brier": 0.24764044265563212,
+    "skill": 0.008672634219086928,
+    "score": 867.2634219086927
+  },
+  "lb_2025": null
+}

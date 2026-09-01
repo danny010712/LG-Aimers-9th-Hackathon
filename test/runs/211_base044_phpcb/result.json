@@ -1,0 +1,31 @@
+{
+  "run": "211_base044_phpcb",
+  "note": "044기준 + COND_ONLY=[ph,pcb]. 과거 205_pcb_7seed(7시드)의 실제 LB=1062.501(044=1062.55 대비 사실상 동일)이었으나, 그때는 보조모델이 009(57열, ph/pcb 모름)로 고정됐었다. 이번엔 보조모델도 65열로 재학습해서 차이가 나는지 확인.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    261,
+    273,
+    285
+  ],
+  "val_2024": {
+    "brier": 0.247638161155392,
+    "skill": 0.008681767273441054,
+    "score": 868.1767273441054
+  },
+  "lb_2025": null
+}

@@ -1,0 +1,27 @@
+{
+  "run": "222_multiclass_joint_team13",
+  "note": "220(조인트 3클래스, cond_ph+cond_bh) + team13_transition(체제전환 지시자, features.py engineer()에 추가된 raw-column 파생 플래그). 마감 임박으로 검증 스킵 — team13 사전검증(원시드Δ-1.1/새시드Δ+4.5, 노이즈 안, 심한 손해 아님)만 확인 후 220의 best_iters=[511,580,402] 및 offset_mc(b,c,mu_mr,mu_wayoff)를 그대로 재사용해 전체 재학습만 수행. 오프셋 재적합 안 함(긴급조치).",
+  "model": "catboost_multiclass",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "MultiClass",
+    "loss_function": "MultiClass"
+  },
+  "n_features": 66,
+  "best_iters": [
+    511,
+    580,
+    402
+  ],
+  "val_2024_with_offset": null,
+  "lb_2025": null,
+  "warning": "검증 스킵 — 220 best_iter/offset 재사용한 긴급배포"
+}

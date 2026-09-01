@@ -181,6 +181,7 @@ level_share      이득 중 레벨 몫 (진단)      🔴 기각 근거로 쓰�
 | — | 1067.500 | 218 = 216 +offset의 mr 보조모델에 `cond_bh` 추가(+0.43, 사실상 무의미) |
 | 893.0(have만) | 1067.705 | **219 = success/mr/wayoff를 CatBoost MultiClass 단일모델로 조인트학습**(별도 보조모델 폐지, §6) |
 | 892.2(원시드)/892.5(새시드) | **1080.349** | 🔥 **220 = 219 +`cond_bh`(주모델 피처로) ← 최고·현 기준선.** 로컬 2세트 부호 불일치(−0.8/+7.0, 노이즈로 오판)였는데 LB **+12.6** = 이번 세션 최대 실이득이자 최대 로컬-LB 괴리 |
+| — | ? | 222 = 220 +`team13_transition`(재검증, closed.tsv). 마감 임박으로 **검증 스킵** — 220의 best_iter/offset_mc/shift를 그대로 재사용해 재학습만 하고 배포. lb_2025 확인되는 대로 이 줄·`result.json`·PAIRS 갱신 필요 |
 
 🔴 **2026-08-26: 로컬 측정에 체계적 편향이 있었다** (09 §2-R)
 ```
@@ -213,7 +214,16 @@ RES = REL의 148배**. calibration·클리핑·스케일·shrink는 전부 REL �
 상수예측 대비: 우리 **+1.06%** / 100위 +1.12% / **1위 +1.42%** → **1위와의 격차는 틀려서가 아니라
 못 갈라내서다**(1위가 35% 더 갈라낸다). 이길 길은 **새 판별 정보**뿐. → 09 §1-M.
 
-## 6. 현재 구성 — run 220 (LB 1080.349) — 2026-08-31~09-01 아키텍처 전환
+## 6. 현재 구성 — run 222 (220 +team13_transition, LB 확인 전) — 2026-08-31~09-02
+
+🔴 **222는 검증 스킵 긴급배포** — 마감 임박으로 `train_multiclass_fast222.py`(일회성)가 220의
+best_iters/offset_mc/검증캐시를 재사용해 team13_transition 1열만 추가하고 재학습만 함. 사전확인은
+`verify_team13_joint.py`(원시드 Δ−1.1/새시드 Δ+4.5, 노이즈폭 안 — 손해만 아니면 배포한다는 사용자
+완화기준 충족)뿐, 222 자체 검증은 없음. **lb_2025 확인되면 §5·result.json·PAIRS 갱신 필수.**
+`team13_transition`은 `features.py engineer()`에 추가(raw 컬럼 결정 플래그라 script.py/build_shift.py
+자동 반영, 듀얼구현 함정 회피). 220까지 배경은 아래 유지:
+
+
 
 🔥 **003~218까지 이어온 "success 단독모델 + mr/wayoff 별도 보조모델 + offset 블렌드" 구조를
 CatBoost `MultiClass` 단일모델로 대체했다.** control_success 실패 ⟺ (middle∪reverse) ⊎ wayoff
@@ -248,14 +258,28 @@ platoon : 미적용(216 계열에서 마이너스였던 축 — 220 위에서 �
 ```
 
 **다음 순서**
-1. ⬜ platoon류를 220 위에서 재검증할지 판단 — 216에서 마이너스였지만 위 교훈(로컬이
-   개체조건부 축을 과소평가)을 감안하면 재검토 여지 있음.
-2. ⬜ `cond_bc`·`cond_pc`(closed.tsv에 노이즈로 닫힌 것들)도 같은 렌즈로 재고할지 검토 —
-   단, LB 슬롯(1일 5회, 팀 공유)이 비싸므로 신중히.
-3. ⬜ mr/reverse/middle 세분화(5클래스: middle_only/both/reverse_only/wayoff/success)
-   로컬 검증 진행 중(2026-09-01) — 라벨을 더 세분화해 트리에 더 세밀한 지도신호를 준다.
-4. 🔴 **로컬 사전스크리닝 신뢰도 자체가 이번에 흔들렸다.** 앞으로는 국소적 out-of-year
-   음성/노이즈 신호만으로 축을 완전히 접지 말고, 슬롯 여유가 있으면 LB로 직접 확인할 것.
+1. 🔴 **최우선**: 222의 `lb_2025` 확인 후 §5 표·result.json·`audit.py PAIRS`에 기록. 검증
+   스킵 상태라 team13_transition의 진짜 기여를 아직 모른다 — 확인되면 이 축의 판정을 닫을 것.
+2. ⬜ **`cond_ph_n`/`cond_bh_n`(셀 표본크기) 노출** — 미시도, 유망 후보(본 세션 발견).
+   `cond.py:70-75`가 EB표 계산 중 `count`를 만들고도 버린다. `asof_pitcher_n`처럼 곁들이면
+   "고표본 확정값 vs 저표본이라 prior에 눌린 값"을 트리가 구분할 신호가 생긴다(판별식①
+   통과 — 이미 계산해놓고 버린 값을 되살리는 것). `ph`/`bh` 둘 다 공짜로 얻음. monotone
+   /class_weights와 달리 **제약이 아니라 정보 추가**라 실패 메커니즘이 다름 — 그래도 검증 필수.
+3. ⬜ 시즌내분해를 `cond_ph/bh` 셀 단위로 세분화하는 아이디어는 **규정 위반으로 폐기**
+   (closed.tsv, test 내부 행간 통계) — 재제안 금지.
+4. ⬜ CatBoost `baseline`=추세외삽 league_rate 주입은 이미 팀원이 LB 실측(+3.33/+1.05,
+   Cochran Q 이론상한과 일치)으로 닫은 축 — build_shift가 이미 더 정교하게 중복 수행 중
+   (closed.tsv:61 "우리 자리 −2~0"). 재제안 금지.
+5. ⬜ platoon류를 220 위에서 재검증할지 판단 — 216에서 마이너스였지만 로컬이 개체조건부
+   축을 과소평가한다는 교훈을 감안하면 재검토 여지 있음.
+6. ⬜ `cond_bc`·`cond_pc`도 같은 렌즈로 재고할지 검토 — LB 슬롯이 비싸므로 신중히.
+7. ⬜ mr/reverse/middle 5클래스 세분화 — 로컬 검증 진행 중(2026-09-01).
+8. 🔴 로컬 사전스크리닝 신뢰도 자체가 흔들렸다. 국소적 out-of-year 음성만으로 완전히
+   접지 말고, 슬롯 여유 있으면 LB로 직접 확인할 것.
+9. ⚙️ **워크플로우**: `train_multiclass.py`는 검증(3시드)→전체재학습을 한 스크립트에서
+   순차로 한다. 백그라운드로 돌리며 검증점수 출력 시점에 나쁘면 `TaskStop`으로 재학습 전에
+   끊고, 괜찮으면 흘러가게 둔다(2026-09-02 사용자 지시). 검증 스킵 긴급배포(222처럼 이전
+   run 파라미터 재사용)는 **마감 임박 등 명시적 요청이 있을 때만** — 기본값 아님.
 
 ## 7-2. ⚖️ 파라미터화 감사 — **번들링이 원인. 그리고 축은 열렸다** (2026-08-25~26)
 
@@ -379,6 +403,7 @@ python audit.py why-not <키워드>   그 축의 🔴/⚠️/❌ 줄만 뽑는�
 | 증상 | 원인 | 해결 |
 |---|---|---|
 | Bash/PowerShell 툴의 `python`이 `ModuleNotFoundError: catboost` | 기본 PATH가 anaconda `base`(3.13, catboost 없음)를 잡음. 실제 catboost 환경은 conda env **`lgaimers`**(Python 3.11.15, catboost1.2.10) | 인터프리터를 **직접 경로로** 호출: `C:/Users/danny/anaconda3/envs/lgaimers/python.exe`. ⚠️ `conda run -n lgaimers python`은 쓰지 말 것 — 래퍼가 자식 stdout을 cp949로 재출력하다 UTF-8 한글에서 `UnicodeEncodeError`로 죽는다(스크립트 자체는 문제 없음) |
+| `CatBoostClassifier(task_type="GPU")`가 CPU보다 13~22배 빠름(RTX 4060Ti 확인) | GPU는 CPU가 쓰는 `Counter` CTR을 아예 구현 안 함("not implemented on GPU yet") — `FeatureFreq` 등 다른 알고리즘으로 대체됨. `border_count`(254→128 기본값 차이)를 맞춰도 해소 안 됨 | ✅ **이미 크고 확고한 축이 GPU에서도 같은 방향으로 나오는지 확인하는 용도**(예: cond_ph 재현, 방향 일치 확인됨)로만 쓸 것. 🔴 **새 마진널 피처 발굴에는 쓰지 말 것** — 2026-09-01 세션에서 GPU "양성일관" 판정 3건(phb·p_outs_wayoff·p_runners_mr)이 CPU 재검증에서 전부 기각됨(0/3). GPU/CPU가 서로 다른 지역해로 수렴해 작은 축의 부호까지 뒤집는다. 최종 배포 학습은 항상 CPU |
 | 즉시 종료, 로그 빔 | Windows stdout cp949에 유니코드 | `sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')` — **파일당 1회만** |
 | 로그가 끝까지 안 보임 | UTF-8 래퍼 블록 버퍼링 | `print(..., flush=True)` |
 | 종료코드 `-1073741676` | CatBoost `thread_count=0` | **CatBoost는 `-1`** (LightGBM만 0=전체) |

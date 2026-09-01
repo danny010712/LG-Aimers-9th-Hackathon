@@ -1,0 +1,31 @@
+{
+  "run": "199_original",
+  "note": "044(LB 1062.55) 복구해보기",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 63,
+  "best_iters": [
+    301,
+    309,
+    311
+  ],
+  "val_2024": {
+    "brier": 0.24764044265563206,
+    "skill": 0.00867263421908715,
+    "score": 867.2634219087149
+  },
+  "lb_2025": null
+}

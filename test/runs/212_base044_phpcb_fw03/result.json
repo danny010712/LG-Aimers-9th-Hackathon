@@ -1,0 +1,31 @@
+{
+  "run": "212_base044_phpcb_fw03",
+  "note": "211_base044_phpcb + pre-2023 F 행 가중치 0.3(09 §1-I dilution 비율). 행 삭제가 아니라 표본가중치로 신뢰도만 낮추는 시도 — 검증용, 2024 validation만 확인.",
+  "model": "catboost",
+  "seeds": [
+    "Sym_42",
+    "Sym_7",
+    "Sym_2024"
+  ],
+  "params": {
+    "iterations": 2000,
+    "learning_rate": 0.05,
+    "depth": 6,
+    "thread_count": -1,
+    "verbose": 0,
+    "eval_metric": "Logloss",
+    "early_stopping_rounds": 100
+  },
+  "n_features": 65,
+  "best_iters": [
+    234,
+    291,
+    282
+  ],
+  "val_2024": {
+    "brier": 0.24762335707538544,
+    "skill": 0.008741029361161279,
+    "score": 874.1029361161279
+  },
+  "lb_2025": null
+}
